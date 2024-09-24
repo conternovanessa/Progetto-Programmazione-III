@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.progetto.nuovo_progetto.server.controller.ServerController">
+    <Label text="Server Log"/>
+    <ListView fx:id="logListView" VBox.vgrow="ALWAYS"/>
+</VBox>

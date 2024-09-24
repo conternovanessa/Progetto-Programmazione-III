@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.progetto.nuovo_progetto.client.controller.ClientController">
+    <HBox>
+        <Button text="Compose" onAction="#handleCompose"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+    <TableView fx:id="emailTableView" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="senderColumn" text="From"/>
+            <TableColumn fx:id="subjectColumn" text="Subject"/>
+            <TableColumn fx:id="dateColumn" text="Date"/>
+        </columns>
+    </TableView>
+</VBox>
