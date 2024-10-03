@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.emailapp.server.controller.ServerController">
+    <TextArea fx:id="logArea" editable="false" VBox.vgrow="ALWAYS"/>
+    <Button text="Start Server" onAction="#startServer"/>
+</VBox>
