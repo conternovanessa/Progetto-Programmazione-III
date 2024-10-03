@@ -3,16 +3,32 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.emailapp.client.controller.ClientController">
-    <HBox>
-        <Button text="Compose" onAction="#composeEmail"/>
-        <Button text="Refresh" onAction="#refreshInbox"/>
-    </HBox>
-    <TableView fx:id="emailTableView" VBox.vgrow="ALWAYS">
-        <columns>
-            <TableColumn text="From" fx:id="fromColumn"/>
-            <TableColumn text="Subject" fx:id="subjectColumn"/>
-            <TableColumn text="Date" fx:id="dateColumn"/>
-        </columns>
-    </TableView>
-</VBox>
+<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.emailapp.client.view.ClientViewController">
+    <top>
+        <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 10;">
+            <Label fx:id="emailAddressLabel" />
+            <Label fx:id="connectionStatusLabel" />
+            <Button text="Compose" onAction="#handleComposeEmail" />
+            <Button text="Refresh" onAction="#handleRefreshEmails" />
+        </HBox>
+    </top>
+
+    <center>
+        <TableView fx:id="emailTableView">
+            <columns>
+                <TableColumn fx:id="senderColumn" text="Sender" />
+                <TableColumn fx:id="subjectColumn" text="Subject" />
+                <TableColumn fx:id="dateColumn" text="Date" />
+            </columns>
+        </TableView>
+    </center>
+
+    <bottom>
+        <HBox spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 10;">
+            <Button text="Reply" onAction="#handleReplyEmail" />
+            <Button text="Reply All" onAction="#handleReplyAllEmail" />
+            <Button text="Forward" onAction="#handleForwardEmail" />
+            <Button text="Delete" onAction="#handleDeleteEmail" />
+        </HBox>
+    </bottom>
+</BorderPane>

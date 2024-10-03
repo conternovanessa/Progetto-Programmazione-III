@@ -1,20 +1,18 @@
 package com.emailapp.server.controller;
-
-import javafx.fxml.FXML;
-import javafx.scene.control.TextArea;
+import com.emailapp.server.model.MailServer;
 
 public class ServerController {
+    private MailServer mailServer;
 
-    @FXML
-    private TextArea logArea;
-
-    @FXML
-    private void startServer() {
-        // Implementa la logica per avviare il server
-        logArea.appendText("Server started...\n");
+    public ServerController() {
+        this.mailServer = new MailServer();
     }
 
-    public void log(String message) {
-        logArea.appendText(message + "\n");
+    public void handleClientRequest(String request) {
+        // Implementa la logica per gestire le richieste dei client
+    }
+
+    public void logEvent(String event) {
+        // Implementa la logica per registrare gli eventi nel log del server
     }
 }

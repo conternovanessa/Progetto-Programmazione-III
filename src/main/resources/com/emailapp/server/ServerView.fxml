@@ -5,5 +5,5 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.emailapp.server.controller.ServerController">
     <TextArea fx:id="logArea" editable="false" VBox.vgrow="ALWAYS"/>
-    <Button text="Start Server" onAction="#startServer"/>
+    <Button fx:id="toggleServerButton" text="Start Server" onAction="#toggleServer"/>
 </VBox>
