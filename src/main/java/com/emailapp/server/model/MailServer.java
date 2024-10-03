@@ -1,9 +1,9 @@
 package com.emailapp.server.model;
 
 import com.emailapp.client.model.Email;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
 
 public class MailServer {
     private Map<String, EmailAccount> accounts;
@@ -16,9 +16,33 @@ public class MailServer {
         accounts.putIfAbsent(email, new EmailAccount(email));
     }
 
-    public void deliverEmail(Email email) {
-        // Implementa la logica per consegnare l'email agli account destinatari
+    public boolean deliverEmail(Email email) {
+        for (String recipient : email.getRecipients()) {
+            EmailAccount account = accounts.get(recipient);
+            if (account != null) {
+                account.addEmail(email);
+            } else {
+                // Handle undelivered email
+                return false;
+            }
+        }
+        return true;
     }
 
-    // Altri metodi per gestire le operazioni del server
+    public List<Email> getNewEmails(String emailAddress) {
+        EmailAccount account = accounts.get(emailAddress);
+        if (account != null) {
+            return account.getNewEmails();
+        }
+        return List.of();
+    }
+
+    public boolean deleteEmail(String emailId) {
+        for (EmailAccount account : accounts.values()) {
+            if (account.deleteEmail(emailId)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

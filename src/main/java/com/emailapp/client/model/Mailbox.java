@@ -53,6 +53,11 @@ public class Mailbox {
         return receivedEmails.size() + sentEmails.size();
     }
 
+    public void removeEmail(Email email) {
+        removeReceivedEmail(email);
+        removeSentEmail(email);
+    }
+
     @Override
     public String toString() {
         return "Mailbox{" +

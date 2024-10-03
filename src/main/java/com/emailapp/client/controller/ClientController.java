@@ -92,7 +92,7 @@ public class ClientController {
     }
 
     public ObservableList<Email> getEmails() {
-        return mailbox.getEmails();
+        return mailbox.getAllEmails();
     }
 
     public String getEmailAddress() {

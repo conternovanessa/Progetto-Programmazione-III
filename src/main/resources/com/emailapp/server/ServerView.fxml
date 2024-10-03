@@ -3,7 +3,8 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.emailapp.server.controller.ServerController">
-    <TextArea fx:id="logArea" editable="false" VBox.vgrow="ALWAYS"/>
-    <Button fx:id="toggleServerButton" text="Start Server" onAction="#toggleServer"/>
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.emailapp.server.view.ServerViewController"
+      spacing="10" alignment="CENTER" style="-fx-padding: 20;">
+    <Label text="Mail Server Log" style="-fx-font-size: 20; -fx-font-weight: bold;"/>
+    <TextArea fx:id="logTextArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS"/>
 </VBox>
