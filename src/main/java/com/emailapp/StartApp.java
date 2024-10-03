@@ -1,6 +1,11 @@
 package com.emailapp;
 
+import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.stage.Stage;
+import com.emailapp.server.Server;
+import com.emailapp.client.Client;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,9 +13,10 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-public class StartApp {
+public class StartApp extends Application {
 
-    public static void main(String[] args) {
+    @Override
+    public void start(Stage primaryStage) {
         // Avvia il server
         startServer();
 
@@ -21,16 +27,14 @@ public class StartApp {
         }
     }
 
-    private static void startServer() {
-        new Thread(() -> {
-            Platform.startup(() -> {
-                try {
-                    new com.emailapp.server.Server().start(new javafx.stage.Stage());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
-        }).start();
+    private void startServer() {
+        Platform.runLater(() -> {
+            try {
+                new Server().start(new Stage());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
 
         // Attendi un po' per assicurarti che il server sia avviato prima dei client
         try {
@@ -40,21 +44,19 @@ public class StartApp {
         }
     }
 
-    private static void startClient(String email) {
-        new Thread(() -> {
-            Platform.startup(() -> {
-                try {
-                    new com.emailapp.client.Client(email).start(new javafx.stage.Stage());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
-        }).start();
+    private void startClient(String email) {
+        Platform.runLater(() -> {
+            try {
+                new Client(email).start(new Stage());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 
-    private static List<String> readEmailAddresses() {
+    private List<String> readEmailAddresses() {
         List<String> emails = new ArrayList<>();
-        try (InputStream is = StartApp.class.getResourceAsStream("/emails.txt");
+        try (InputStream is = getClass().getResourceAsStream("/emails.txt");
              BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -64,5 +66,9 @@ public class StartApp {
             e.printStackTrace();
         }
         return emails;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }
