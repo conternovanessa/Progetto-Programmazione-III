@@ -35,6 +35,17 @@ public class Client extends Application {
         primaryStage.setTitle("Email Client - " + emailAddress);
         primaryStage.show();
 
-        clientController.fetchNewEmails();
+        // Aggiorna lo stato della connessione all'avvio
+        clientController.checkConnection();
+    }
+
+    @Override
+    public void stop() {
+        // Gestione della chiusura del client
+        try {
+            ClientController.shutdown();
+        } catch (Exception e) {
+            e.printStackTrace(); // Log dell'errore
+        }
     }
 }

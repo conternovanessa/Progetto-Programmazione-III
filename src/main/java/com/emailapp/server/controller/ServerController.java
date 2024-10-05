@@ -1,59 +1,54 @@
 package com.emailapp.server.controller;
 
-import com.emailapp.server.model.MailServer;
-import com.emailapp.client.model.Email;
+import com.emailapp.server.Server;
 import com.emailapp.server.view.ServerViewController;
 import javafx.application.Platform;
 
-import java.util.List;
-
 public class ServerController {
-    private MailServer mailServer;
-    private ServerViewController viewController;
 
-    public ServerController() {
-        this.mailServer = new MailServer();
-    }
+    private final ServerViewController viewController;
+    private Server server;
+    private boolean isServerRunning;
 
-    public void setViewController(ServerViewController viewController) {
+    public ServerController(ServerViewController viewController) {
         this.viewController = viewController;
+        this.isServerRunning = false;
     }
 
-    public void handleClientRequest(String request, Object data) {
-        switch (request) {
-            case "SEND_EMAIL":
-                handleSendEmail((Email) data);
-                break;
-            case "FETCH_NEW_EMAILS":
-                handleFetchNewEmails((String) data);
-                break;
-            case "DELETE_EMAIL":
-                handleDeleteEmail((String) data);
-                break;
-            default:
-                logEvent("Unknown request: " + request);
+    public void logEvent(String message) {
+        if (viewController != null) {
+            Platform.runLater(() -> {
+                try {
+                    viewController.addLogEntry(message);
+                } catch (Exception e) {
+                    System.err.println("Error logging event: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            });
+        } else {
+            System.err.println("viewController is null! Cannot log event: " + message);
         }
     }
 
-    private void handleSendEmail(Email email) {
-        boolean success = mailServer.deliverEmail(email);
-        logEvent("Email sent from " + email.getSender() + " to " + email.getRecipients());
-        // Respond to client with success status
+    public void startServer() {
+        if (!isServerRunning) {
+            server = new Server(this);
+            server.start();
+            isServerRunning = true;
+            viewController.updateServerStatus(true);
+        }
     }
 
-    private void handleFetchNewEmails(String emailAddress) {
-        List<Email> newEmails = mailServer.getNewEmails(emailAddress);
-        logEvent("Fetched " + newEmails.size() + " new emails for " + emailAddress);
-        // Send newEmails to client
+    public void stopServer() {
+        if (isServerRunning && server != null) {
+            server.stop();
+            isServerRunning = false;
+            viewController.updateServerStatus(false);
+        }
     }
 
-    private void handleDeleteEmail(String emailId) {
-        boolean success = mailServer.deleteEmail(emailId);
-        logEvent("Deleted email with ID: " + emailId);
-        // Respond to client with success status
+    public boolean isServerRunning() {
+        return isServerRunning;
     }
 
-    public void logEvent(String event) {
-        Platform.runLater(() -> viewController.addLogEntry(event));
-    }
 }
