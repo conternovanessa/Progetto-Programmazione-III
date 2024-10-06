@@ -1,54 +1,138 @@
 package com.emailapp.server.controller;
 
-import com.emailapp.server.Server;
+import com.emailapp.server.model.EmailAccount;
+import com.emailapp.server.model.MailServer;
+import com.emailapp.common.NetworkUtils;
+import com.emailapp.client.model.Email;
 import com.emailapp.server.view.ServerViewController;
 import javafx.application.Platform;
 
-public class ServerController {
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+public class ServerController {
+    private final MailServer mailServer;
+    private ExecutorService executorService;
+    private ServerSocket serverSocket;
+    private boolean isRunning;
     private final ServerViewController viewController;
-    private Server server;
-    private boolean isServerRunning;
+    private static final int DEFAULT_PORT = 5000;
 
     public ServerController(ServerViewController viewController) {
+        this.mailServer = new MailServer();
         this.viewController = viewController;
-        this.isServerRunning = false;
+        this.executorService = Executors.newCachedThreadPool();
+        startServer(DEFAULT_PORT); // Start the server automatically
     }
 
-    public void logEvent(String message) {
-        if (viewController != null) {
-            Platform.runLater(() -> {
-                try {
-                    viewController.addLogEntry(message);
-                } catch (Exception e) {
-                    System.err.println("Error logging event: " + e.getMessage());
-                    e.printStackTrace();
+    public void startServer(int port) {
+        if (isRunning) {
+            return;
+        }
+        try {
+            serverSocket = new ServerSocket(port);
+            isRunning = true;
+            executorService.submit(this::acceptConnections);
+            logEvent("Server started on port " + port);
+        } catch (IOException e) {
+            logEvent("Failed to start server: " + e.getMessage());
+        }
+    }
+
+    private void acceptConnections() {
+        while (isRunning) {
+            try {
+                Socket clientSocket = serverSocket.accept();
+                executorService.submit(() -> handleClient(clientSocket));
+            } catch (IOException e) {
+                if (isRunning) {
+                    logEvent("Error accepting client connection: " + e.getMessage());
                 }
-            });
-        } else {
-            System.err.println("viewController is null! Cannot log event: " + message);
+            }
         }
     }
 
-    public void startServer() {
-        if (!isServerRunning) {
-            server = new Server(this);
-            server.start();
-            isServerRunning = true;
-            viewController.updateServerStatus(true);
+    private void handleClient(Socket clientSocket) {
+        try {
+            String command = (String) NetworkUtils.receiveObject(clientSocket);
+            switch (command) {
+                case "SEND_EMAIL":
+                    handleSendEmail(clientSocket);
+                    break;
+                case "FETCH_NEW_EMAILS":
+                    handleFetchNewEmails(clientSocket);
+                    break;
+                case "DELETE_EMAIL":
+                    handleDeleteEmail(clientSocket);
+                    break;
+                case "PING":
+                    NetworkUtils.sendObject(clientSocket, "PONG");
+                    break;
+                default:
+                    logEvent("Unknown command: " + command);
+            }
+        } catch (Exception e) {
+            logEvent("Error handling client: " + e.getMessage());
+        } finally {
+            try {
+                clientSocket.close();
+            } catch (IOException e) {
+                logEvent("Error closing client socket: " + e.getMessage());
+            }
         }
+    }
+
+    private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
+        Email email = (Email) NetworkUtils.receiveObject(clientSocket);
+        mailServer.sendEmail(email);
+        NetworkUtils.sendObject(clientSocket, "SUCCESS");
+        logEvent("Email sent from " + email.getSender() + " to " + email.getRecipients());
+    }
+
+    private void handleFetchNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
+        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
+        List<Email> newEmails = mailServer.getNewEmails(recipient);
+        NetworkUtils.sendObject(clientSocket, newEmails);
+        logEvent("Fetched " + newEmails.size() + " new emails for " + recipient);
+    }
+
+    private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
+        String emailId = (String) NetworkUtils.receiveObject(clientSocket);
+        boolean success = mailServer.deleteEmail(emailId);
+        NetworkUtils.sendObject(clientSocket, success ? "SUCCESS" : "FAILURE");
+        logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId);
     }
 
     public void stopServer() {
-        if (isServerRunning && server != null) {
-            server.stop();
-            isServerRunning = false;
-            viewController.updateServerStatus(false);
+        if (!isRunning) {
+            return;
         }
+        isRunning = false;
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            logEvent("Error closing server socket: " + e.getMessage());
+        }
+        executorService.shutdownNow();
+        executorService = Executors.newCachedThreadPool(); // Create a new ExecutorService for future use
+        logEvent("Server stopped");
     }
 
-    public boolean isServerRunning() {
-        return isServerRunning;
+    public void logEvent(String message) {
+        Platform.runLater(() -> viewController.logEvent(message));
     }
 
+    public MailServer getMailServer() {
+        return mailServer;
+    }
+
+    public boolean isRunning() {
+        return isRunning;
+    }
 }

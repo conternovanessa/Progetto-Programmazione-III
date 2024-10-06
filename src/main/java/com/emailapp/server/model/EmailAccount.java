@@ -1,32 +1,42 @@
 package com.emailapp.server.model;
+
 import com.emailapp.client.model.Email;
-import java.util.ArrayList;
-import java.util.List;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 public class EmailAccount {
-    private String emailAddress;
-    private List<Email> inbox;
+    private final String emailAddress;
+    private final ObservableList<Email> inbox;
+    private final ObservableList<Email> sent;
 
     public EmailAccount(String emailAddress) {
         this.emailAddress = emailAddress;
-        this.inbox = new ArrayList<>();
-    }
-
-    public void addEmail(Email email) {
-        inbox.add(email);
-    }
-
-    public List<Email> getNewEmails() {
-        List<Email> newEmails = new ArrayList<>(inbox);
-        inbox.clear();
-        return newEmails;
-    }
-
-    public boolean deleteEmail(String emailId) {
-        return inbox.removeIf(email -> email.getId().equals(emailId));
+        this.inbox = FXCollections.observableArrayList();
+        this.sent = FXCollections.observableArrayList();
     }
 
     public String getEmailAddress() {
         return emailAddress;
+    }
+
+    public ObservableList<Email> getInbox() {
+        return inbox;
+    }
+
+    public ObservableList<Email> getSent() {
+        return sent;
+    }
+
+    public void addToInbox(Email email) {
+        inbox.add(email);
+    }
+
+    public void addToSent(Email email) {
+        sent.add(email);
+    }
+
+    public boolean removeEmail(String emailId) {
+        return inbox.removeIf(email -> email.getId().equals(emailId)) ||
+                sent.removeIf(email -> email.getId().equals(emailId));
     }
 }

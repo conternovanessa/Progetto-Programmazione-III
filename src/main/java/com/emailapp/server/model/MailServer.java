@@ -1,48 +1,51 @@
 package com.emailapp.server.model;
 
 import com.emailapp.client.model.Email;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MailServer {
-    private Map<String, EmailAccount> accounts;
+    private final Map<String, EmailAccount> accounts;
 
     public MailServer() {
-        this.accounts = new ConcurrentHashMap<>();
+        this.accounts = new HashMap<>();
     }
 
-    public void addAccount(String email) {
-        accounts.putIfAbsent(email, new EmailAccount(email));
+    public void createAccount(String emailAddress) {
+        accounts.putIfAbsent(emailAddress, new EmailAccount(emailAddress));
     }
 
-    public boolean deliverEmail(Email email) {
-        for (String recipient : email.getRecipients()) {
-            EmailAccount account = accounts.get(recipient);
-            if (account != null) {
-                account.addEmail(email);
-            } else {
-                // Handle undelivered email
-                return false;
-            }
+    public void sendEmail(Email email) {
+        String sender = email.getSender();
+        List<String> recipients = email.getRecipients();
+
+        createAccount(sender);
+        accounts.get(sender).addToSent(email);
+
+        for (String recipient : recipients) {
+            createAccount(recipient);
+            accounts.get(recipient).addToInbox(email);
         }
-        return true;
     }
 
-    public List<Email> getNewEmails(String emailAddress) {
-        EmailAccount account = accounts.get(emailAddress);
-        if (account != null) {
-            return account.getNewEmails();
-        }
-        return List.of();
+    public List<Email> getNewEmails(String recipient) {
+        createAccount(recipient);
+        return new ArrayList<>(accounts.get(recipient).getInbox());
     }
 
     public boolean deleteEmail(String emailId) {
         for (EmailAccount account : accounts.values()) {
-            if (account.deleteEmail(emailId)) {
+            if (account.removeEmail(emailId)) {
                 return true;
             }
         }
         return false;
+    }
+
+    public Map<String, EmailAccount> getAccounts() {
+        return accounts;
     }
 }

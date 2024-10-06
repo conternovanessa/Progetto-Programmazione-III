@@ -3,41 +3,47 @@ package com.emailapp.server.view;
 import com.emailapp.server.controller.ServerController;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 
 public class ServerViewController {
-    @FXML
-    private TextArea logTextArea;
 
-    @FXML
-    private Button toggleServerButton;
+    @FXML private Label portLabel;    // Sostituito TextField con Label
+    @FXML private Button startStopButton;
+    @FXML private TextArea logTextArea;
 
     private ServerController serverController;
 
     public void setServerController(ServerController serverController) {
         this.serverController = serverController;
-    }
-
-    public void addLogEntry(String entry) {
-        if (logTextArea != null) {
-            logTextArea.appendText(entry + "\n");
-        } else {
-            System.err.println("logTextArea is null. Cannot add log entry: " + entry);
-        }
+        updateButtonState();
     }
 
     @FXML
-    private void handleToggleServer() {
-        if (serverController.isServerRunning()) {
-            serverController.stopServer();
-            toggleServerButton.setText("Start Server");
-        } else {
-            serverController.startServer();
-            toggleServerButton.setText("Stop Server");
-        }
+    private void initialize() {
+        portLabel.setText("5000");   // Imposta la porta come testo della label
     }
 
-    public void updateServerStatus(boolean isRunning) {
-        toggleServerButton.setText(isRunning ? "Stop Server" : "Start Server");
+    @FXML
+    private void handleStartStop() {
+        if (serverController.isRunning()) {
+            serverController.stopServer();
+        } else {
+            int port = Integer.parseInt(portLabel.getText());  // Usa la label per ottenere la porta
+            serverController.startServer(port);
+        }
+        updateButtonState();
+    }
+
+    public void logEvent(String message) {
+        logTextArea.appendText(message + "\n");
+    }
+
+    private void updateButtonState() {
+        if (serverController.isRunning()) {
+            startStopButton.setText("Stop Server");
+        } else {
+            startStopButton.setText("Start Server");
+        }
     }
 }

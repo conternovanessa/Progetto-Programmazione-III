@@ -54,6 +54,7 @@ public class StartApp extends Application {
         } catch (IOException e) {
             e.printStackTrace();
             System.err.println("Errore durante l'avvio dell'applicazione: " + e.getMessage());
+            Platform.exit();
         }
     }
 
