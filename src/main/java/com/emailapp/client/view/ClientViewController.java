@@ -2,11 +2,16 @@ package com.emailapp.client.view;
 
 import com.emailapp.client.controller.ClientController;
 import com.emailapp.client.model.Email;
+import com.emailapp.client.model.EmailDraft;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
 
+import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 
 public class ClientViewController {
@@ -17,6 +22,7 @@ public class ClientViewController {
     @FXML private TableColumn<Email, String> senderColumn;
     @FXML private TableColumn<Email, String> subjectColumn;
     @FXML private TableColumn<Email, String> dateColumn;
+    @FXML private ListView<EmailDraft> activeDraftsListView;
 
     private ClientController clientController;
     private Stage primaryStage;
@@ -37,6 +43,7 @@ public class ClientViewController {
         this.clientController = clientController;
         emailAddressLabel.setText(clientController.getEmailAddress());
         emailTableView.setItems(clientController.getEmails());
+        activeDraftsListView.setItems(clientController.getActiveDrafts());
 
         clientController.connectedProperty().addListener((observable, oldValue, newValue) -> {
             connectionStatusLabel.setText(newValue ? "Connected" : "Disconnected");
@@ -50,7 +57,31 @@ public class ClientViewController {
 
     @FXML
     private void handleComposeEmail() {
-        // Implementa la logica per aprire una nuova finestra di composizione email
+        EmailDraft draft = clientController.startNewDraft();
+        openDraftEditor(draft);
+    }
+
+    private void openDraftEditor(EmailDraft draft) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/client/DraftEditorView.fxml"));
+            Parent root = loader.load();
+            DraftEditorViewController controller = loader.getController();
+            controller.setDraft(draft);
+            controller.setClientController(clientController);
+
+            Stage stage = new Stage();
+            stage.setTitle("Compose Email");
+            stage.setScene(new Scene(root));
+            stage.show();
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Mostra un messaggio di errore all'utente
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to open draft editor");
+            alert.setContentText("An error occurred while trying to open the draft editor: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
 
     @FXML
@@ -59,10 +90,16 @@ public class ClientViewController {
     }
 
     @FXML
+    private void handleRefreshDrafts() {
+        clientController.fetchActiveDrafts();
+    }
+
+    @FXML
     private void handleReplyEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            // Implementa la logica per rispondere all'email selezionata
+            EmailDraft draft = clientController.createReplyDraft(selectedEmail);
+            openDraftEditor(draft);
         }
     }
 
@@ -70,7 +107,8 @@ public class ClientViewController {
     private void handleReplyAllEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            // Implementa la logica per rispondere a tutti per l'email selezionata
+            EmailDraft draft = clientController.createReplyAllDraft(selectedEmail);
+            openDraftEditor(draft);
         }
     }
 
@@ -78,7 +116,8 @@ public class ClientViewController {
     private void handleForwardEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            // Implementa la logica per inoltrare l'email selezionata
+            EmailDraft draft = clientController.createForwardDraft(selectedEmail);
+            openDraftEditor(draft);
         }
     }
 
@@ -89,6 +128,4 @@ public class ClientViewController {
             clientController.deleteEmail(selectedEmail);
         }
     }
-
-    // Metodi aggiuntivi per gestire la visualizzazione dei dettagli dell'email, ecc.
 }

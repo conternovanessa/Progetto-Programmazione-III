@@ -9,18 +9,22 @@
             <Label fx:id="emailAddressLabel" />
             <Label fx:id="connectionStatusLabel" />
             <Button text="Compose" onAction="#handleComposeEmail" />
-            <Button text="Refresh" onAction="#handleRefreshEmails" />
+            <Button text="Refresh Emails" onAction="#handleRefreshEmails" />
+            <Button text="Refresh Drafts" onAction="#handleRefreshDrafts" />
         </HBox>
     </top>
 
     <center>
-        <TableView fx:id="emailTableView">
-            <columns>
-                <TableColumn fx:id="senderColumn" text="Sender" />
-                <TableColumn fx:id="subjectColumn" text="Subject" />
-                <TableColumn fx:id="dateColumn" text="Date" />
-            </columns>
-        </TableView>
+        <SplitPane dividerPositions="0.7">
+            <TableView fx:id="emailTableView">
+                <columns>
+                    <TableColumn fx:id="senderColumn" text="Sender" />
+                    <TableColumn fx:id="subjectColumn" text="Subject" />
+                    <TableColumn fx:id="dateColumn" text="Date" />
+                </columns>
+            </TableView>
+            <ListView fx:id="activeDraftsListView" />
+        </SplitPane>
     </center>
 
     <bottom>

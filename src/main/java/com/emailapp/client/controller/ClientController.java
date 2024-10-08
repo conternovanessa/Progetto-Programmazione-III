@@ -1,18 +1,24 @@
 package com.emailapp.client.controller;
 
 import com.emailapp.client.model.Email;
+import com.emailapp.client.model.EmailDraft;
 import com.emailapp.client.model.Mailbox;
+import com.emailapp.common.EmailPersistence;
 import com.emailapp.common.NetworkUtils;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.ObservableMap;
 import javafx.scene.control.Alert;
 
 import java.io.IOException;
 import java.net.Socket;
 import java.net.ConnectException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -23,12 +29,115 @@ public class ClientController {
     private final Mailbox mailbox;
     private static ExecutorService executorService = null;
     private final BooleanProperty connectedProperty;
+    private final ObservableMap<String, EmailDraft> activeDrafts;
 
     public ClientController(String emailAddress) {
         this.mailbox = new Mailbox(emailAddress);
         this.executorService = Executors.newCachedThreadPool();
         this.connectedProperty = new SimpleBooleanProperty(false);
+        this.activeDrafts = FXCollections.observableHashMap();
         startConnectionChecker();
+        loadEmails();
+    }
+
+    public EmailDraft startNewDraft() {
+        EmailDraft draft = new EmailDraft(mailbox.getEmailAddress());
+        activeDrafts.put(draft.getId(), draft);
+        notifyServerAboutDraft(draft);
+        return draft;
+    }
+
+    public EmailDraft createReplyDraft(Email originalEmail) {
+        EmailDraft draft = new EmailDraft(mailbox.getEmailAddress());
+        draft.setRecipients(originalEmail.getSender());
+        draft.setSubject("Re: " + originalEmail.getSubject());
+        draft.setBody("\n\nOn " + originalEmail.getSentDate() + ", " + originalEmail.getSender() + " wrote:\n" + originalEmail.getBody());
+        activeDrafts.put(draft.getId(), draft);
+        notifyServerAboutDraft(draft);
+        return draft;
+    }
+
+    public EmailDraft createReplyAllDraft(Email originalEmail) {
+        EmailDraft draft = new EmailDraft(mailbox.getEmailAddress());
+        List<String> recipients = originalEmail.getRecipients();
+        recipients.remove(mailbox.getEmailAddress());
+        recipients.add(originalEmail.getSender());
+        draft.setRecipients(String.join(",", recipients));
+        draft.setSubject("Re: " + originalEmail.getSubject());
+        draft.setBody("\n\nOn " + originalEmail.getSentDate() + ", " + originalEmail.getSender() + " wrote:\n" + originalEmail.getBody());
+        activeDrafts.put(draft.getId(), draft);
+        notifyServerAboutDraft(draft);
+        return draft;
+    }
+
+    public EmailDraft createForwardDraft(Email originalEmail) {
+        EmailDraft draft = new EmailDraft(mailbox.getEmailAddress());
+        draft.setSubject("Fwd: " + originalEmail.getSubject());
+        draft.setBody("\n\n---------- Forwarded message ---------\n" +
+                "From: " + originalEmail.getSender() + "\n" +
+                "Date: " + originalEmail.getSentDate() + "\n" +
+                "Subject: " + originalEmail.getSubject() + "\n" +
+                "To: " + String.join(", ", originalEmail.getRecipients()) + "\n\n" +
+                originalEmail.getBody());
+        activeDrafts.put(draft.getId(), draft);
+        notifyServerAboutDraft(draft);
+        return draft;
+    }
+
+    public ObservableList<EmailDraft> getActiveDrafts() {
+        return FXCollections.observableArrayList(activeDrafts.values());
+    }
+
+    private void notifyServerAboutDraft(EmailDraft draft) {
+        executorService.submit(() -> {
+            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                NetworkUtils.sendObject(socket, "START_DRAFT");
+                NetworkUtils.sendObject(socket, draft);
+            } catch (Exception e) {
+                handleConnectionError(e);
+            }
+        });
+    }
+
+    public void updateDraft(EmailDraft draft) {
+        notifyServerAboutDraft(draft);
+    }
+
+    public void sendDraft(EmailDraft draft) {
+        Email email = new Email(draft.getSender(),
+                Arrays.asList(draft.getRecipients().split(",")),
+                draft.getSubject(),
+                draft.getBody());
+        sendEmail(email);
+        activeDrafts.remove(draft.getId());
+        notifyServerAboutDraftCompletion(draft.getId());
+    }
+
+    private void notifyServerAboutDraftCompletion(String draftId) {
+        executorService.submit(() -> {
+            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                NetworkUtils.sendObject(socket, "COMPLETE_DRAFT");
+                NetworkUtils.sendObject(socket, draftId);
+            } catch (Exception e) {
+                handleConnectionError(e);
+            }
+        });
+    }
+
+    public void fetchActiveDrafts() {
+        executorService.submit(() -> {
+            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                NetworkUtils.sendObject(socket, "FETCH_ACTIVE_DRAFTS");
+                @SuppressWarnings("unchecked")
+                Map<String, EmailDraft> serverDrafts = (Map<String, EmailDraft>) NetworkUtils.receiveObject(socket);
+                Platform.runLater(() -> {
+                    activeDrafts.clear();
+                    activeDrafts.putAll(serverDrafts);
+                });
+            } catch (Exception e) {
+                handleConnectionError(e);
+            }
+        });
     }
 
     public void sendEmail(Email email) {
@@ -44,6 +153,11 @@ public class ClientController {
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
                     Platform.runLater(() -> mailbox.addSentEmail(email));
+                    try {
+                        EmailPersistence.saveEmail(email);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 } else {
                     Platform.runLater(() -> showErrorAlert("Send Error", "Failed to send email"));
                 }
@@ -70,6 +184,11 @@ public class ClientController {
                 Platform.runLater(() -> {
                     for (Email email : newEmails) {
                         mailbox.addReceivedEmail(email);
+                        try {
+                            EmailPersistence.saveEmail(email);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
                     showInfoAlert("New Emails", "Received " + newEmails.size() + " new email(s)");
                 });
@@ -174,6 +293,23 @@ public class ClientController {
                 }
             }
         });
+    }
+
+    public void loadEmails() {
+        try {
+            List<Email> loadedEmails = EmailPersistence.loadAllEmails();
+            Platform.runLater(() -> {
+                for (Email email : loadedEmails) {
+                    if (email.getSender().equals(mailbox.getEmailAddress())) {
+                        mailbox.addSentEmail(email);
+                    } else {
+                        mailbox.addReceivedEmail(email);
+                    }
+                }
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void shutdown() {
