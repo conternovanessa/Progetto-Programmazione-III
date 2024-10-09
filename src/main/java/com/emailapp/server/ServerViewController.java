@@ -1,6 +1,5 @@
-package com.emailapp.server.view;
+package com.emailapp.server;
 
-import com.emailapp.server.controller.ServerController;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;

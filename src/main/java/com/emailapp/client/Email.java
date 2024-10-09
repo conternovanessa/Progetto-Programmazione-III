@@ -1,4 +1,4 @@
-package com.emailapp.client.model;
+package com.emailapp.client;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;

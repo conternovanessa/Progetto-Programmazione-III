@@ -8,8 +8,8 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 import com.emailapp.server.Server;
 import com.emailapp.client.Client;
-import com.emailapp.server.controller.ServerController;
-import com.emailapp.server.view.ServerViewController;
+import com.emailapp.server.ServerController;
+import com.emailapp.server.ServerViewController;
 
 import java.io.BufferedReader;
 import java.io.IOException;

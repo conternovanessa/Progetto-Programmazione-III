@@ -1,6 +1,5 @@
 package com.emailapp.client;
 
-import com.emailapp.client.controller.ClientController;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;

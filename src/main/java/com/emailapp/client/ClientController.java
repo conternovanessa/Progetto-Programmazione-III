@@ -1,13 +1,10 @@
-package com.emailapp.client.controller;
+package com.emailapp.client;
 
-import com.emailapp.client.model.Email;
-import com.emailapp.client.model.Mailbox;
-import com.emailapp.common.NetworkUtils;
-import com.emailapp.common.EmailFileManager;
+import com.emailapp.NetworkUtils;
+import com.emailapp.EmailFileManager;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
-import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;

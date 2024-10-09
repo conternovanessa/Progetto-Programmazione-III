@@ -1,10 +1,7 @@
-package com.emailapp.server.controller;
+package com.emailapp.server;
 
-import com.emailapp.server.model.EmailAccount;
-import com.emailapp.server.model.MailServer;
-import com.emailapp.common.NetworkUtils;
-import com.emailapp.client.model.Email;
-import com.emailapp.server.view.ServerViewController;
+import com.emailapp.NetworkUtils;
+import com.emailapp.client.Email;
 import javafx.application.Platform;
 
 import java.io.IOException;

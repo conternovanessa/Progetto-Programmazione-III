@@ -1,4 +1,4 @@
-package com.emailapp.common;
+package com.emailapp;
 
 import java.io.*;
 import java.net.Socket;

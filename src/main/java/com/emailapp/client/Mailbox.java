@@ -1,7 +1,7 @@
-package com.emailapp.client.model;
+package com.emailapp.client;
 
-import com.emailapp.common.EmailFileManager;
-import com.emailapp.common.NetworkUtils;
+import com.emailapp.EmailFileManager;
+import com.emailapp.NetworkUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -11,7 +11,6 @@ import java.net.Socket;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 public class Mailbox {
     private static final String SERVER_ADDRESS = "localhost";

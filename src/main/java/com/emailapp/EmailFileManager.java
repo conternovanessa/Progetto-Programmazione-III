@@ -1,6 +1,6 @@
-package com.emailapp.common;
+package com.emailapp;
 
-import com.emailapp.client.model.Email;
+import com.emailapp.client.Email;
 
 import java.io.*;
 import java.nio.file.*;
