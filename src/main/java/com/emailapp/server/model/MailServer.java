@@ -1,7 +1,9 @@
 package com.emailapp.server.model;
 
 import com.emailapp.client.model.Email;
+import com.emailapp.common.EmailFileManager;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +30,12 @@ public class MailServer {
         for (String recipient : recipients) {
             createAccount(recipient);
             accounts.get(recipient).addToInbox(email);
+            try {
+                EmailFileManager.saveEmail(email, recipient);
+            } catch (IOException e) {
+                e.printStackTrace();
+                // Log the error or handle it appropriately
+            }
         }
     }
 

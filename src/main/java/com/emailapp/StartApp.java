@@ -73,10 +73,11 @@ public class StartApp extends Application {
     }
 
     private void startClient(String email) {
-        // Avvia ogni client in una nuova finestra
         Platform.runLater(() -> {
             try {
-                new Client(email).start(new Stage());
+                Client client = new Client();
+                client.setEmailAddress(email);
+                client.start(new Stage());
             } catch (Exception e) {
                 e.printStackTrace();
                 System.err.println("Errore durante l'avvio del client per " + email + ": " + e.getMessage());
