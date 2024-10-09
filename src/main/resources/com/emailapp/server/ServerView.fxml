@@ -15,3 +15,4 @@
     </HBox>
     <TextArea fx:id="logTextArea" VBox.vgrow="ALWAYS" editable="false"/>
 </VBox>
+

@@ -32,3 +32,4 @@ public class Client extends Application {
         controller.checkConnection();
     }
 }
+
