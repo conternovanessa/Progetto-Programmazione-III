@@ -13,7 +13,9 @@ import javafx.scene.layout.VBox;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.ConnectException;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +39,8 @@ public class ClientController {
     private final Mailbox mailbox;
     private static ExecutorService executorService;
     private final BooleanProperty connectedProperty;
+    private static final long ALERT_INTERVAL_SECONDS = 30;
+    private Instant lastAlertTime = Instant.MIN;
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -72,14 +76,27 @@ public class ClientController {
                 NetworkUtils.sendObject(socket, "PING");
                 String response = (String) NetworkUtils.receiveObject(socket);
                 boolean isConnected = "PONG".equals(response);
-                Platform.runLater(() -> connectedProperty.set(isConnected));
+                Platform.runLater(() -> {
+                    connectedProperty.set(isConnected);
+                    if (!isConnected) {
+                        showDisconnectionAlert();
+                    }
+                });
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     connectedProperty.set(false);
-                    showErrorAlert("Connection Error", "Failed to connect to the server: " + e.getMessage());
+                    showDisconnectionAlert();
                 });
             }
         });
+    }
+
+    private void showDisconnectionAlert() {
+        Instant now = Instant.now();
+        if (ChronoUnit.SECONDS.between(lastAlertTime, now) >= ALERT_INTERVAL_SECONDS) {
+            handleConnectionError(new Exception("Server disconnected"));
+            lastAlertTime = now;
+        }
     }
 
     public void setEmailAddress(String emailAddress) {
@@ -300,7 +317,7 @@ public class ClientController {
     private void handleConnectionError(Exception e) {
         Platform.runLater(() -> {
             connectedProperty.set(false);
-            showErrorAlert("Connection Error", "Failed to connect to the server: " + e.getMessage());
+            showErrorAlert("Connection Error", "Failed to connect to the server: " + e.getMessage() + "\nPlease try again later.");
         });
     }
 
