@@ -10,20 +10,25 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.Socket;
 import java.net.ConnectException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ClientController {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
+    private static final long ALERT_INTERVAL_SECONDS = 30;
 
     @FXML private Label emailAddressLabel;
     @FXML private Label connectionStatusLabel;
@@ -39,13 +44,14 @@ public class ClientController {
     private final Mailbox mailbox;
     private static ExecutorService executorService;
     private final BooleanProperty connectedProperty;
-    private static final long ALERT_INTERVAL_SECONDS = 30;
     private Instant lastAlertTime = Instant.MIN;
+    private Set<String> validEmails;
 
     public ClientController() {
         this.mailbox = new Mailbox("");
         executorService = Executors.newCachedThreadPool();
         this.connectedProperty = new SimpleBooleanProperty(false);
+        loadValidEmails();
     }
 
     @FXML
@@ -68,6 +74,23 @@ public class ClientController {
 
         startConnectionChecker();
         loadEmailsFromDisk();
+    }
+
+    private void loadValidEmails() {
+        validEmails = new HashSet<>();
+        try (InputStream inputStream = getClass().getResourceAsStream("/emails.txt");
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                validEmails.add(line.trim());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            showErrorAlert("Error", "Failed to load valid email addresses from emails.txt.");
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+            showErrorAlert("Error", "emails.txt file not found in resources.");
+        }
     }
 
     public void checkConnection() {
@@ -129,16 +152,22 @@ public class ClientController {
     @FXML
     private void handleSendEmail() {
         if (validateFields()) {
+            String recipient = toField.getText().trim();
+            if (!isValidRecipient(recipient)) {
+                showErrorAlert("Indirizzo inesistente", "L'indirzzo email fornito non è presente in emails.txt");
+                return;
+            }
             Email newEmail = new Email();
             newEmail.setSender(mailbox.getEmailAddress());
-            newEmail.setRecipients(Collections.singletonList(toField.getText()));
+            newEmail.setRecipients(Collections.singletonList(recipient));
             newEmail.setSubject(subjectField.getText());
             newEmail.setBody(bodyArea.getText());
-
             sendEmail(newEmail);
-            composeView.setVisible(false);
-            clearComposeFields();
         }
+    }
+
+    private boolean isValidRecipient(String email) {
+        return validEmails.contains(email);
     }
 
     @FXML
@@ -187,16 +216,21 @@ public class ClientController {
                 NetworkUtils.sendObject(socket, email);
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> mailbox.addSentEmail(email));
+                    Platform.runLater(() -> {
+                        mailbox.addSentEmail(email);
+                        composeView.setVisible(false);
+                        clearComposeFields();
+                        showInfoAlert("Email Sent", "Your email has been sent successfully.");
+                    });
                 } else {
-                    Platform.runLater(() -> showErrorAlert("Send Error", "Failed to send email"));
+                    Platform.runLater(() -> showErrorAlert("Send Error", "Failed to send email: " + response));
                 }
             } catch (ConnectException e) {
                 Platform.runLater(this::showServerClosedAlert);
             } catch (Exception e) {
                 handleConnectionError(e);
                 e.printStackTrace();
-                Platform.runLater(() -> showErrorAlert("Save Error", "Failed to save email to disk"));
+                Platform.runLater(() -> showErrorAlert("Send Error", "Failed to send email: " + e.getMessage()));
             }
         });
     }
@@ -308,7 +342,6 @@ public class ClientController {
             }
         });
     }
-
 
     public boolean isConnected() {
         return connectedProperty.get();
