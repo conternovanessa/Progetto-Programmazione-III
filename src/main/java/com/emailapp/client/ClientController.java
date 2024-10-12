@@ -12,7 +12,9 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
-
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,7 +34,7 @@ public class ClientController {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
     private static final long ALERT_INTERVAL_SECONDS = 30;
-
+    private Timeline autoRefreshTimeline;
     @FXML private Label emailAddressLabel;
     @FXML private Label connectionStatusLabel;
     @FXML private TableView<Email> emailTableView;
@@ -89,11 +91,22 @@ public class ClientController {
 
         startConnectionChecker();
         loadEmailsFromDisk();
+        setupAutoRefresh();
     }
 
     private void refreshEmailTable() {
         emailTableView.setItems(mailbox.getAllEmails());
         emailTableView.refresh();
+    }
+
+    private void setupAutoRefresh() {
+        autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(10), event -> {
+            if (isConnected()) {
+                fetchNewEmails();
+            }
+        }));
+        autoRefreshTimeline.setCycleCount(Timeline.INDEFINITE);
+        autoRefreshTimeline.play();
     }
 
     private void loadValidEmails() {
@@ -219,7 +232,7 @@ public class ClientController {
         if (validateFields()) {
             String recipient = toField.getText().trim();
             if (!isValidRecipient(recipient)) {
-                showErrorAlert("Indirizzo inesistente", "L'indirzzo email fornito non è presente in emails.txt");
+                showErrorAlert("Indirizzo inesistente", "L'indirizzo email fornito non è presente in emails.txt");
                 return;
             }
             Email newEmail = new Email();
@@ -228,6 +241,9 @@ public class ClientController {
             newEmail.setSubject(subjectField.getText());
             newEmail.setBody(bodyArea.getText());
             sendEmail(newEmail);
+            // Chiudi la vista di composizione
+            composeView.setVisible(false);
+            clearComposeFields();
         }
     }
 
@@ -271,13 +287,15 @@ public class ClientController {
 
         executorService.submit(() -> {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                EmailFileManager.saveEmail(email, mailbox.getEmailAddress());
+                // Rimuoviamo il salvataggio locale dell'email
+                // EmailFileManager.saveEmail(email, mailbox.getEmailAddress());
                 NetworkUtils.sendObject(socket, "SEND_EMAIL");
                 NetworkUtils.sendObject(socket, email);
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
                     Platform.runLater(() -> {
-                        mailbox.addSentEmail(email);
+                        // Non aggiungiamo più l'email alla mailbox locale
+                        // mailbox.addSentEmail(email);
                         composeView.setVisible(false);
                         clearComposeFields();
                         showInfoAlert("Email Sent", "Your email has been sent successfully.");
@@ -320,7 +338,10 @@ public class ClientController {
                             newEmailCount++;
                         }
                     }
-                    showInfoAlert("New Emails", "Received " + newEmailCount + " new email(s)");
+                    if (newEmailCount > 0) {
+                        refreshEmailTable();
+                        showInfoAlert("New Emails", "Received " + newEmailCount + " new email(s)");
+                    }
                 });
             } catch (ConnectException e) {
                 Platform.runLater(this::showServerClosedAlert);
@@ -449,10 +470,9 @@ public class ClientController {
         });
     }
 
-    public static void shutdown() {
-        // This method should be called when the application is closing
-        if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdownNow();
+    public void shutdown() {
+        if (autoRefreshTimeline != null) {
+            autoRefreshTimeline.stop();
         }
     }
 }

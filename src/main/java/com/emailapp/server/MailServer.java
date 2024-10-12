@@ -20,24 +20,36 @@ public class MailServer {
         accounts.putIfAbsent(emailAddress, new EmailAccount(emailAddress));
     }
 
+
     public void sendEmail(Email email) {
         String sender = email.getSender();
         List<String> recipients = email.getRecipients();
 
+        // Crea gli account se non esistono
         createAccount(sender);
-        accounts.get(sender).addToSent(email);
-
         for (String recipient : recipients) {
             createAccount(recipient);
+        }
+
+        // Salva l'email nelle inbox dei destinatari e nella sent del mittente
+        for (String recipient : recipients) {
             accounts.get(recipient).addToInbox(email);
             try {
                 EmailFileManager.saveEmail(email, recipient);
             } catch (IOException e) {
                 e.printStackTrace();
-                // Log the error or handle it appropriately
             }
         }
+
+        // Aggiungi l'email alla cartella sent del mittente
+        accounts.get(sender).addToSent(email);
+        try {
+            EmailFileManager.saveEmail(email, sender);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
 
     public List<Email> getNewEmails(String recipient) {
         createAccount(recipient);
