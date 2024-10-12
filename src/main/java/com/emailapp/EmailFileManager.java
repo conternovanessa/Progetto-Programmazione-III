@@ -14,29 +14,31 @@ public class EmailFileManager {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     public static void saveEmail(Email email, String userEmail) throws IOException {
-        Path userDir = Paths.get(BASE_DIR, userEmail);
-        Files.createDirectories(userDir);
+        for (String recipient : email.getRecipients()) { // Per ogni destinatario
+            Path userDir = Paths.get(BASE_DIR, recipient); // Crea la directory per il destinatario
+            Files.createDirectories(userDir);
 
-        String fileName = email.getSentDate().format(DATE_FORMATTER) + "_" + email.getId() + ".txt";
-        Path filePath = userDir.resolve(fileName);
+            String fileName = email.getSentDate().format(DATE_FORMATTER) + "_" + email.getId() + ".txt";
+            Path filePath = userDir.resolve(fileName);
 
-        try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
-            writer.write("From: " + email.getSender());
-            writer.newLine();
-            writer.write("To: " + String.join(", ", email.getRecipients()));
-            writer.newLine();
-            writer.write("Subject: " + email.getSubject());
-            writer.newLine();
-            writer.write("Date: " + email.getSentDate());
-            writer.newLine();
-            writer.newLine();
-            writer.write(email.getBody());
+            try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
+                writer.write("From: " + email.getSender());
+                writer.newLine();
+                writer.write("To: " + String.join(", ", email.getRecipients()));
+                writer.newLine();
+                writer.write("Subject: " + email.getSubject());
+                writer.newLine();
+                writer.write("Date: " + email.getSentDate());
+                writer.newLine();
+                writer.write("Body: " + email.getBody());
+            }
         }
     }
 
+
     public static List<Email> loadEmails(String userEmail) throws IOException {
         List<Email> emails = new ArrayList<>();
-        Path userDir = Paths.get(BASE_DIR, userEmail);
+        Path userDir = Paths.get(BASE_DIR, userEmail); // Directory del destinatario
 
         if (Files.exists(userDir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(userDir, "*.txt")) {
@@ -45,7 +47,6 @@ public class EmailFileManager {
                 }
             }
         }
-
         return emails;
     }
 
