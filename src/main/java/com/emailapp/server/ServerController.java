@@ -95,7 +95,6 @@ public class ServerController {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
         List<Email> newEmails = mailServer.getNewEmails(recipient);
         NetworkUtils.sendObject(clientSocket, newEmails);
-        logEvent("Fetched " + newEmails.size() + " new emails for " + recipient);
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {

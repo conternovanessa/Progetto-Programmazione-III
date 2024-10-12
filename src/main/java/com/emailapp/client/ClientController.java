@@ -100,7 +100,7 @@ public class ClientController {
     }
 
     private void setupAutoRefresh() {
-        autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(10), event -> {
+        autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             if (isConnected()) {
                 fetchNewEmails();
             }
@@ -313,10 +313,6 @@ public class ClientController {
         });
     }
 
-    @FXML
-    private void handleRefreshEmails() {
-        fetchNewEmails();
-    }
 
     private void fetchNewEmails() {
         if (!isConnected()) {

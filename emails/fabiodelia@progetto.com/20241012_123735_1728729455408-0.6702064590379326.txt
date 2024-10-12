@@ -1,5 +1,0 @@
-From: filippoditto@progetto.com
-To: fabiodelia@progetto.com
-Subject: Prova 2
-Date: 2024-10-12T12:37:35.408649200
-Body: Ciao

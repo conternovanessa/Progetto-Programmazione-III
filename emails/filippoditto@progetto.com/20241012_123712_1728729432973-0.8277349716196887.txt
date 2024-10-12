@@ -1,5 +1,0 @@
-From: vanessaconterno@progetto.com
-To: filippoditto@progetto.com
-Subject: Prova 1
-Date: 2024-10-12T12:37:12.987052
-Body: Ciao

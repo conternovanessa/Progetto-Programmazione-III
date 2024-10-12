@@ -14,7 +14,6 @@
                     <Label fx:id="emailAddressLabel" />
                     <Label fx:id="connectionStatusLabel" />
                     <Button text="Compose" onAction="#handleComposeEmail" />
-                    <Button text="Refresh" onAction="#handleRefreshEmails" />
                 </HBox>
             </top>
 
