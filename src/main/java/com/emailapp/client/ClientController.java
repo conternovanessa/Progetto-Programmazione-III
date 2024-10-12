@@ -9,6 +9,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.TextFlow;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -40,6 +41,8 @@ public class ClientController {
     @FXML private TextField toField;
     @FXML private TextField subjectField;
     @FXML private TextArea bodyArea;
+    @FXML private TextFlow emailDetailFlow; // Change to TextFlow
+    @FXML private Label emailDetailLabel; // New Label for email details
 
     private final Mailbox mailbox;
     private static ExecutorService executorService;
@@ -67,6 +70,11 @@ public class ClientController {
 
         emailTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         emailTableView.setItems(mailbox.getAllEmails());
+        emailTableView.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) { // Detect double-click
+                handleEmailSelection();
+            }
+        });
 
         connectedProperty.addListener((observable, oldValue, newValue) -> {
             connectionStatusLabel.setText(newValue ? "Connected" : "Disconnected");
@@ -133,6 +141,27 @@ public class ClientController {
         emailAddressLabel.setText(emailAddress);
         mailbox.loadEmailsFromDisk();
     }
+
+    @FXML
+    private void handleEmailSelection() {
+        Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
+        if (selectedEmail != null) {
+            System.out.println("Selected Email Body: " + selectedEmail.getBody()); // Debugging line
+            displayEmailDetails(selectedEmail);
+        }
+    }
+
+
+    private void displayEmailDetails(Email email) {
+        String emailDetails = "From: " + email.getSender() + "\n" +
+                "To: " + String.join(", ", email.getRecipients()) + "\n" +
+                "Subject: " + email.getSubject() + "\n" +
+                "Date: " + email.getSentDate().toString() + "\n" +
+                "Body: " + email.getBody().trim().replaceAll("\\s+", " "); // Format the email content
+
+        emailDetailLabel.setText(emailDetails); // Set text to the Label
+    }
+
 
     private void loadEmailsFromDisk() {
         executorService.submit(() -> {

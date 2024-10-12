@@ -4,6 +4,7 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
 
+<?import javafx.scene.text.TextFlow?>
 <StackPane xmlns:fx="http://javafx.com/fxml"
            fx:controller="com.emailapp.client.ClientController">
     <VBox>
@@ -18,13 +19,20 @@
             </top>
 
             <center>
-                <TableView fx:id="emailTableView">
-                    <columns>
-                        <TableColumn fx:id="senderColumn" text="Sender" />
-                        <TableColumn fx:id="subjectColumn" text="Subject" />
-                        <TableColumn fx:id="dateColumn" text="Date" />
-                    </columns>
-                </TableView>
+                <HBox spacing="10"> <!-- Change center to HBox -->
+                    <TableView fx:id="emailTableView" onMouseClicked="#handleEmailSelection">
+                        <columns>
+                            <TableColumn fx:id="senderColumn" text="Sender" />
+                            <TableColumn fx:id="subjectColumn" text="Subject" />
+                            <TableColumn fx:id="dateColumn" text="Date" />
+                        </columns>
+                    </TableView>
+
+                    <!-- Replace TextArea with a Label wrapped in TextFlow -->
+                    <TextFlow fx:id="emailDetailFlow" style="-fx-padding: 10;">
+                        <Label fx:id="emailDetailLabel" wrapText="true" />
+                    </TextFlow>
+                </HBox>
             </center>
 
             <bottom>
@@ -59,4 +67,3 @@
         </VBox>
     </VBox>
 </StackPane>
-
