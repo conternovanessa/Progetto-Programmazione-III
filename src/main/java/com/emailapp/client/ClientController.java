@@ -56,6 +56,7 @@ public class ClientController {
 
     @FXML
     public void initialize() {
+        mailbox.setEmailLoadedCallback(this::refreshEmailTable);
         senderColumn.setCellValueFactory(new PropertyValueFactory<>("sender"));
         subjectColumn.setCellValueFactory(new PropertyValueFactory<>("subject"));
         dateColumn.setCellValueFactory(cellData -> {
@@ -74,6 +75,11 @@ public class ClientController {
 
         startConnectionChecker();
         loadEmailsFromDisk();
+    }
+
+    private void refreshEmailTable() {
+        emailTableView.setItems(mailbox.getAllEmails());
+        emailTableView.refresh();
     }
 
     private void loadValidEmails() {
@@ -125,16 +131,21 @@ public class ClientController {
     public void setEmailAddress(String emailAddress) {
         mailbox.setEmailAddress(emailAddress);
         emailAddressLabel.setText(emailAddress);
+        mailbox.loadEmailsFromDisk();
     }
 
     private void loadEmailsFromDisk() {
         executorService.submit(() -> {
             try {
-                List<Email> loadedEmails = EmailFileManager.loadEmails(mailbox.getEmailAddress());
+                // Usa il corretto indirizzo email dell'utente
+                String userEmail = mailbox.getEmailAddress();
+                List<Email> loadedEmails = EmailFileManager.loadEmails(userEmail);
                 Platform.runLater(() -> {
+                    mailbox.clearEmails(); // Pulisce le email esistenti prima di aggiungere quelle caricate
                     for (Email email : loadedEmails) {
                         mailbox.addReceivedEmail(email);
                     }
+                    emailTableView.refresh(); // Aggiorna la vista della tabella
                 });
             } catch (IOException e) {
                 e.printStackTrace();

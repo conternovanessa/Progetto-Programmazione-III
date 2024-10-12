@@ -20,6 +20,7 @@ public class Mailbox {
     private ObservableList<Email> receivedEmails;
     private ObservableList<Email> sentEmails;
     private ExecutorService executorService;
+    private Runnable emailLoadedCallback;
 
     public Mailbox(String emailAddress) {
         this.emailAddress = emailAddress;
@@ -31,15 +32,22 @@ public class Mailbox {
     public void loadEmailsFromDisk() {
         executorService.submit(() -> {
             try {
+                System.out.println("Loading emails for: " + emailAddress);
                 List<Email> loadedEmails = EmailFileManager.loadEmails(emailAddress);
+                System.out.println("Loaded " + loadedEmails.size() + " emails");
                 Platform.runLater(() -> {
+                    clearAllEmails();
                     for (Email email : loadedEmails) {
                         addReceivedEmail(email);
+                    }
+                    System.out.println("Total emails after loading: " + getTotalEmailCount());
+                    if (emailLoadedCallback != null) {
+                        emailLoadedCallback.run();
                     }
                 });
             } catch (IOException e) {
                 e.printStackTrace();
-                // Note: Error handling should be done in the UI layer
+                System.err.println("Error loading emails: " + e.getMessage());
             }
         });
     }
@@ -51,6 +59,10 @@ public class Mailbox {
             clearAllEmails();
             loadEmailsFromDisk();
         }
+    }
+
+    public void setEmailLoadedCallback(Runnable callback) {
+        this.emailLoadedCallback = callback;
     }
 
 
@@ -119,6 +131,11 @@ public class Mailbox {
         if (!hasEmail(email.getId())) {
             receivedEmails.add(email);
         }
+    }
+
+    public void clearEmails() {
+        receivedEmails.clear();
+        sentEmails.clear();
     }
 
     public void addSentEmail(Email email) {
