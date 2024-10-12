@@ -3,8 +3,8 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
-
 <?import javafx.scene.text.TextFlow?>
+
 <StackPane xmlns:fx="http://javafx.com/fxml"
            fx:controller="com.emailapp.client.ClientController">
     <VBox>
@@ -28,15 +28,42 @@
                         </columns>
                     </TableView>
 
-                    <!-- Replace TextArea with a Label wrapped in TextFlow -->
-                    <TextFlow fx:id="emailDetailFlow" style="-fx-padding: 10;">
-                        <Label fx:id="emailDetailLabel" wrapText="true" />
-                    </TextFlow>
+                    <!-- This will contain either the email detail or compose view -->
+                    <StackPane fx:id="detailOrComposeStack" style="-fx-padding: 10;">
+
+                        <!-- Replace TextArea with a Label wrapped in TextFlow for email details -->
+                        <TextFlow fx:id="emailDetailFlow" visible="false">
+                            <Label fx:id="emailDetailLabel" wrapText="true" />
+                        </TextFlow>
+
+
+                        <!-- Compose view -->
+                        <VBox fx:id="composeView" visible="false" spacing="10" maxWidth="400" maxHeight="500">
+                            <padding>
+                                <Insets top="20" right="20" bottom="20" left="20"/>
+                            </padding>
+
+                            <GridPane vgap="10" hgap="10">
+                                <Label text="To:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                                <TextField fx:id="toField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+
+                                <Label text="Subject:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                                <TextField fx:id="subjectField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                            </GridPane>
+
+                            <TextArea fx:id="bodyArea" VBox.vgrow="ALWAYS" promptText="Compose your email here..." />
+
+                            <HBox spacing="10" alignment="CENTER_RIGHT">
+                                <Button text="Send" onAction="#handleSendEmail" />
+                                <Button text="Cancel" onAction="#handleCancelEmail" />
+                            </HBox>
+                        </VBox>
+                    </StackPane>
                 </HBox>
             </center>
 
             <bottom>
-                <HBox spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 10;">
+                <HBox fx:id="actionButtons" spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 10;" visible="false">
                     <Button text="Reply" onAction="#handleReplyEmail" />
                     <Button text="Reply All" onAction="#handleReplyAllEmail" />
                     <Button text="Forward" onAction="#handleForwardEmail" />
@@ -44,26 +71,5 @@
                 </HBox>
             </bottom>
         </BorderPane>
-
-        <VBox fx:id="composeView" visible="false" spacing="10" maxWidth="400" maxHeight="500">
-            <padding>
-                <Insets top="20" right="20" bottom="20" left="20"/>
-            </padding>
-
-            <GridPane vgap="10" hgap="10">
-                <Label text="To:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                <TextField fx:id="toField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
-
-                <Label text="Subject:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                <TextField fx:id="subjectField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-            </GridPane>
-
-            <TextArea fx:id="bodyArea" VBox.vgrow="ALWAYS" promptText="Compose your email here..." />
-
-            <HBox spacing="10" alignment="CENTER_RIGHT">
-                <Button text="Send" onAction="#handleSendEmail" />
-                <Button text="Cancel" onAction="#handleCancelEmail" />
-            </HBox>
-        </VBox>
     </VBox>
 </StackPane>

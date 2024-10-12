@@ -8,6 +8,8 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
 
@@ -37,12 +39,16 @@ public class ClientController {
     @FXML private TableColumn<Email, String> senderColumn;
     @FXML private TableColumn<Email, String> subjectColumn;
     @FXML private TableColumn<Email, String> dateColumn;
-    @FXML private VBox composeView;
     @FXML private TextField toField;
     @FXML private TextField subjectField;
     @FXML private TextArea bodyArea;
-    @FXML private TextFlow emailDetailFlow; // Change to TextFlow
-    @FXML private Label emailDetailLabel; // New Label for email details
+    @FXML private VBox emailDetailView; // VBox for email details
+    @FXML private Label emailDetailLabel; // Label for email details
+    @FXML private HBox actionButtons; // HBox for action buttons (Reply, Reply All, Forward, Delete)
+    @FXML private TextFlow emailDetailFlow;
+    @FXML private VBox composeView; // For composing email
+    @FXML private StackPane detailOrComposeStack; // The StackPane that contains both views
+
 
     private final Mailbox mailbox;
     private static ExecutorService executorService;
@@ -146,20 +152,28 @@ public class ClientController {
     private void handleEmailSelection() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            System.out.println("Selected Email Body: " + selectedEmail.getBody()); // Debugging line
-            displayEmailDetails(selectedEmail);
+            displayEmailDetails(selectedEmail); // Display the selected email details
+            composeView.setVisible(false); // Hide the compose view
+            emailDetailFlow.setVisible(true); // Show email details
+            detailOrComposeStack.getChildren().setAll(emailDetailFlow); // Ensure only email detail view is in the StackPane
         }
     }
 
+    @FXML
+    private void handleComposeEmail() {
+        emailDetailFlow.setVisible(false); // Hide email details
+        composeView.setVisible(true); // Show the compose view
+        detailOrComposeStack.getChildren().setAll(composeView); // Ensure only compose view is in the StackPane
+    }
 
     private void displayEmailDetails(Email email) {
         String emailDetails = "From: " + email.getSender() + "\n" +
                 "To: " + String.join(", ", email.getRecipients()) + "\n" +
                 "Subject: " + email.getSubject() + "\n" +
                 "Date: " + email.getSentDate().toString() + "\n" +
-                "Body: " + email.getBody().trim().replaceAll("\\s+", " "); // Format the email content
+                "Body: " + email.getBody().trim().replaceAll("\\s+", " ");
 
-        emailDetailLabel.setText(emailDetails); // Set text to the Label
+        emailDetailLabel.setText(emailDetails); // Update the email detail label
     }
 
 
@@ -183,11 +197,6 @@ public class ClientController {
         });
     }
 
-    @FXML
-    private void handleComposeEmail() {
-        composeView.setVisible(true);
-        clearComposeFields();
-    }
 
     @FXML
     private void handleSendEmail() {
