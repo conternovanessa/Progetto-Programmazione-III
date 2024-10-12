@@ -30,14 +30,12 @@
 
                     <!-- This will contain either the email detail or compose view -->
                     <StackPane fx:id="detailOrComposeStack" style="-fx-padding: 10;">
-
-                        <!-- Replace TextArea with a Label wrapped in TextFlow for email details -->
+                        <!-- Email Details -->
                         <TextFlow fx:id="emailDetailFlow" visible="false">
                             <Label fx:id="emailDetailLabel" wrapText="true" />
                         </TextFlow>
 
-
-                        <!-- Compose view -->
+                        <!-- Compose View -->
                         <VBox fx:id="composeView" visible="false" spacing="10" maxWidth="400" maxHeight="500">
                             <padding>
                                 <Insets top="20" right="20" bottom="20" left="20"/>
@@ -55,7 +53,7 @@
 
                             <HBox spacing="10" alignment="CENTER_RIGHT">
                                 <Button text="Send" onAction="#handleSendEmail" />
-                                <Button text="Cancel" onAction="#handleCancelEmail" />
+                                <Button text="Back" onAction="#handleCancelEmail" /> <!-- Back button -->
                             </HBox>
                         </VBox>
                     </StackPane>
@@ -68,8 +66,10 @@
                     <Button text="Reply All" onAction="#handleReplyAllEmail" />
                     <Button text="Forward" onAction="#handleForwardEmail" />
                     <Button text="Delete" onAction="#handleDeleteEmail" />
+                    <Button text="Back" onAction="#handleBackButton" />
                 </HBox>
             </bottom>
         </BorderPane>
     </VBox>
 </StackPane>
+

@@ -153,8 +153,10 @@ public class ClientController {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
             displayEmailDetails(selectedEmail); // Display the selected email details
+            emailTableView.setVisible(false); // Hide the email table view when an email is selected
             composeView.setVisible(false); // Hide the compose view
             emailDetailFlow.setVisible(true); // Show email details
+            actionButtons.setVisible(true); // Show action buttons
             detailOrComposeStack.getChildren().setAll(emailDetailFlow); // Ensure only email detail view is in the StackPane
         }
     }
@@ -176,6 +178,20 @@ public class ClientController {
         emailDetailLabel.setText(emailDetails); // Update the email detail label
     }
 
+    @FXML
+    private void handleCancelEmail() {
+        composeView.setVisible(false);
+        clearComposeFields();
+        actionButtons.setVisible(false); // Hide action buttons when cancelling compose
+    }
+
+    @FXML
+    private void handleBackButton() {
+        emailDetailFlow.setVisible(false); // Hide email details
+        composeView.setVisible(false); // Ensure compose view is hidden as well
+        actionButtons.setVisible(false); // Hide action buttons
+        emailTableView.setVisible(true); // Show the email list view again
+    }
 
     private void loadEmailsFromDisk() {
         executorService.submit(() -> {
@@ -219,11 +235,6 @@ public class ClientController {
         return validEmails.contains(email);
     }
 
-    @FXML
-    private void handleCancelEmail() {
-        composeView.setVisible(false);
-        clearComposeFields();
-    }
 
     private void clearComposeFields() {
         toField.clear();
