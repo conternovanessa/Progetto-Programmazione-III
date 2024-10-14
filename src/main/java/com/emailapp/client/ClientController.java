@@ -392,10 +392,19 @@ public class ClientController {
     private void handleDeleteEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            deleteEmail(selectedEmail);
+            Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmAlert.setTitle("Conferma eliminazione");
+            confirmAlert.setHeaderText("Sei sicuro di voler eliminare questa email?");
+            confirmAlert.setContentText("Questa azione non può essere annullata.");
+
+            Optional<ButtonType> result = confirmAlert.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                deleteEmail(selectedEmail);
+            }
+        } else {
+            showErrorAlert("Nessuna email selezionata", "Seleziona un'email da eliminare.");
         }
     }
-
     private void openComposeWindow(Email selectedEmail, String mode) {
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
@@ -503,16 +512,21 @@ public class ClientController {
                 NetworkUtils.sendObject(socket, email.getId());
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> mailbox.removeEmail(email));
+                    Platform.runLater(() -> {
+                        mailbox.removeEmail(email);
+                        refreshEmailTable();
+                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
+                        returnToEmailListView();
+                    });
                     EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
                 } else {
-                    Platform.runLater(() -> showErrorAlert("Delete Error", "Failed to delete email"));
+                    Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
                 }
             } catch (ConnectException e) {
                 Platform.runLater(this::showServerClosedAlert);
             } catch (Exception e) {
                 handleConnectionError(e);
-                Platform.runLater(() -> showErrorAlert("Delete Error", "Failed to delete email from disk"));
+                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
             }
         });
     }
