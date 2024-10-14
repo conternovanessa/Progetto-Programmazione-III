@@ -1,0 +1,5 @@
+From: filippoditto@progetto.com
+To: vanessaconterno@progetto.com, fabiodelia@progetto.com
+Subject: Test1
+Date: 2024-10-14T09:46:08.822719
+Body: si

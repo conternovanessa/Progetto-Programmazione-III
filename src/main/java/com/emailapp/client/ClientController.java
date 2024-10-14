@@ -230,27 +230,32 @@ public class ClientController {
     @FXML
     private void handleSendEmail() {
         if (validateFields()) {
-            String recipient = toField.getText().trim();
-            if (!isValidRecipient(recipient)) {
-                showErrorAlert("Indirizzo inesistente", "L'indirizzo email fornito non è presente in emails.txt");
+            String recipientsString = toField.getText().trim();
+            List<String> recipients = Arrays.asList(recipientsString.split("\\s*,\\s*"));
+
+            // Validazione degli indirizzi email
+            boolean allValid = recipients.stream().allMatch(this::isValidRecipient);
+
+            if (!allValid) {
+                showErrorAlert("Indirizzo inesistente", "Uno o più indirizzi email forniti non sono presenti in emails.txt");
                 return;
             }
+
             Email newEmail = new Email();
             newEmail.setSender(mailbox.getEmailAddress());
-            newEmail.setRecipients(Collections.singletonList(recipient));
+            newEmail.setRecipients(recipients);
             newEmail.setSubject(subjectField.getText());
             newEmail.setBody(bodyArea.getText());
             sendEmail(newEmail);
-            // Chiudi la vista di composizione
+
             composeView.setVisible(false);
             clearComposeFields();
         }
     }
 
     private boolean isValidRecipient(String email) {
-        return validEmails.contains(email);
+        return validEmails.contains(email.trim());
     }
-
 
     private void clearComposeFields() {
         toField.clear();
