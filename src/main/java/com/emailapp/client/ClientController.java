@@ -400,7 +400,6 @@ public class ClientController {
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
         emailTableView.setVisible(false);
-        composeView.setVisible(true);
         actionButtons.setVisible(false);
 
         if (selectedEmail != null) {
@@ -412,6 +411,8 @@ public class ClientController {
                 allRecipients.add(selectedEmail.getSender());
                 allRecipients.remove(mailbox.getEmailAddress()); // Remove the current user's email
                 toField.setText(String.join(", ", allRecipients));
+            } else if (mode.equals("Forward")) {
+                toField.clear(); // Clear the recipient field for forward
             }
             toField.setEditable(mode.equals("Forward")); // Make the recipient field editable only for Forward
 
@@ -420,24 +421,40 @@ public class ClientController {
             subjectField.setText(subjectPrefix + selectedEmail.getSubject());
 
             // Set the body
-            String originalBody = selectedEmail.getBody();
-            String quotedBody = originalBody.lines()
-                    .map(line -> "> " + line)
-                    .collect(Collectors.joining("\n"));
-            // Combine date and sender on a single line
-            String headerLine = String.format("On %s, %s wrote:",
-                    selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
-                    selectedEmail.getSender());
-            bodyArea.setText("\n\n" + headerLine + "\n" + quotedBody);
+            StringBuilder bodyBuilder = new StringBuilder();
+            if (mode.equals("Forward")) {
+                bodyBuilder.append("\n\n---------- Forwarded message ---------\n");
+                bodyBuilder.append("From: ").append(selectedEmail.getSender()).append("\n");
+                bodyBuilder.append("Date: ").append(selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))).append("\n");
+                bodyBuilder.append("Subject: ").append(selectedEmail.getSubject()).append("\n");
+                bodyBuilder.append("To: ").append(String.join(", ", selectedEmail.getRecipients())).append("\n\n");
+                bodyBuilder.append(selectedEmail.getBody());
+            } else {
+                String originalBody = selectedEmail.getBody();
+                String quotedBody = originalBody.lines()
+                        .map(line -> "> " + line)
+                        .collect(Collectors.joining("\n"));
+                String headerLine = String.format("On %s, %s wrote:",
+                        selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                        selectedEmail.getSender());
+                bodyBuilder.append("\n\n").append(headerLine).append("\n").append(quotedBody);
+            }
+            bodyArea.setText(bodyBuilder.toString());
 
             // Place the cursor at the beginning of the body
             bodyArea.positionCaret(0);
-            detailOrComposeStack.getChildren().setAll(composeView);
         }
+
+        // Ensure the compose view takes up the same space as the email detail view
+        detailOrComposeStack.getChildren().setAll(composeView);
+        composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
+        composeView.prefHeightProperty().bind(detailOrComposeStack.heightProperty());
+
         sendButton.setOnAction(event -> {
             handleSendEmail();
             returnToEmailListView();
         });
+        handleBackInCompose();
     }
 
     @FXML
@@ -446,12 +463,32 @@ public class ClientController {
     }
 
     private void returnToEmailListView() {
+        // Hide compose and detail views
         composeView.setVisible(false);
         emailDetailFlow.setVisible(false);
         actionButtons.setVisible(false);
+
+        // Show email table view
         emailTableView.setVisible(true);
+
+        // Ensure the email table view is the only child of the detailOrComposeStack
+        detailOrComposeStack.getChildren().clear();
+        detailOrComposeStack.getChildren().add(emailTableView);
+
+        // Reset the layout
+        emailTableView.setManaged(true);
+        emailTableView.setMaxWidth(Double.MAX_VALUE);
+        emailTableView.setMaxHeight(Double.MAX_VALUE);
+
+        // Clear compose fields
         clearComposeFields();
+
+        // Refresh the email table
         refreshEmailTable();
+
+        // Request layout update
+        emailTableView.requestLayout();
+        detailOrComposeStack.requestLayout();
     }
 
     private void deleteEmail(Email email) {
