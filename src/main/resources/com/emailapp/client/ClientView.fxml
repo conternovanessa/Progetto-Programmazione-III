@@ -5,70 +5,65 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.text.TextFlow?>
 
-<StackPane xmlns:fx="http://javafx.com/fxml"
-           fx:controller="com.emailapp.client.ClientController">
-    <VBox>
-        <BorderPane>
-            <top>
-                <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 10;">
-                    <Label fx:id="emailAddressLabel" />
-                    <Label fx:id="connectionStatusLabel" />
-                    <Button text="Compose" onAction="#handleComposeEmail" />
-                </HBox>
-            </top>
+<BorderPane xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.emailapp.client.ClientController">
+    <top>
+        <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 10;">
+            <Label fx:id="emailAddressLabel" />
+            <Label fx:id="connectionStatusLabel" />
+            <Button text="Compose" onAction="#handleComposeEmail" />
+        </HBox>
+    </top>
 
-            <center>
-                <HBox spacing="10"> <!-- Change center to HBox -->
-                    <TableView fx:id="emailTableView" onMouseClicked="#handleEmailSelection">
-                        <columns>
-                            <TableColumn fx:id="senderColumn" text="Sender" />
-                            <TableColumn fx:id="subjectColumn" text="Subject" />
-                            <TableColumn fx:id="dateColumn" text="Date" />
-                        </columns>
-                    </TableView>
+    <center>
+        <SplitPane dividerPositions="0.4">
+            <TableView fx:id="emailTableView" onMouseClicked="#handleEmailSelection">
+                <columns>
+                    <TableColumn fx:id="senderColumn" text="Sender" />
+                    <TableColumn fx:id="subjectColumn" text="Subject" />
+                    <TableColumn fx:id="dateColumn" text="Date" />
+                </columns>
+            </TableView>
 
-                    <!-- This will contain either the email detail or compose view -->
-                    <StackPane fx:id="detailOrComposeStack" style="-fx-padding: 10;">
-                        <!-- Email Details -->
-                        <TextFlow fx:id="emailDetailFlow" visible="false">
-                            <Label fx:id="emailDetailLabel" wrapText="true" />
-                        </TextFlow>
+            <StackPane fx:id="detailOrComposeStack">
+                <TextFlow fx:id="emailDetailFlow" visible="false">
+                    <padding>
+                        <Insets top="20" right="20" bottom="20" left="20"/>
+                    </padding>
+                    <Label fx:id="emailDetailLabel" wrapText="true" />
+                </TextFlow>
 
-                        <!-- Compose View -->
-                        <VBox fx:id="composeView" visible="false" spacing="10" maxWidth="400" maxHeight="500">
-                            <padding>
-                                <Insets top="20" right="20" bottom="20" left="20"/>
-                            </padding>
+                <VBox fx:id="composeView" visible="false" spacing="10">
+                    <padding>
+                        <Insets top="20" right="20" bottom="20" left="20"/>
+                    </padding>
 
-                            <GridPane vgap="10" hgap="10">
-                                <Label text="To:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                                <TextField fx:id="toField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                    <GridPane vgap="10" hgap="10">
+                        <Label text="To:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                        <TextField fx:id="toField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
 
-                                <Label text="Subject:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                                <TextField fx:id="subjectField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-                            </GridPane>
+                        <Label text="Subject:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                        <TextField fx:id="subjectField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                    </GridPane>
 
-                            <TextArea fx:id="bodyArea" VBox.vgrow="ALWAYS" promptText="Compose your email here..." />
+                    <TextArea fx:id="bodyArea" VBox.vgrow="ALWAYS" promptText="Compose your email here..." />
 
-                            <HBox spacing="10" alignment="CENTER_RIGHT">
-                                <Button text="Send" onAction="#handleSendEmail" />
-                                <Button text="Back" onAction="#handleCancelEmail" /> <!-- Back button -->
-                            </HBox>
-                        </VBox>
-                    </StackPane>
-                </HBox>
-            </center>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <Button fx:id="sendButton" text="Send" onAction="#handleSendEmail" />
+                        <Button text="Back" onAction="#handleBackInCompose" />
+                    </HBox>
+                </VBox>
+            </StackPane>
+        </SplitPane>
+    </center>
 
-            <bottom>
-                <HBox fx:id="actionButtons" spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 10;" visible="false">
-                    <Button text="Reply" onAction="#handleReplyEmail" />
-                    <Button text="Reply All" onAction="#handleReplyAllEmail" />
-                    <Button text="Forward" onAction="#handleForwardEmail" />
-                    <Button text="Delete" onAction="#handleDeleteEmail" />
-                    <Button text="Back" onAction="#handleBackButton" />
-                </HBox>
-            </bottom>
-        </BorderPane>
-    </VBox>
-</StackPane>
-
+    <bottom>
+        <HBox fx:id="actionButtons" spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 10;" visible="false">
+            <Button text="Reply" onAction="#handleReplyEmail" />
+            <Button text="Reply All" onAction="#handleReplyAllEmail" />
+            <Button text="Forward" onAction="#handleForwardEmail" />
+            <Button text="Delete" onAction="#handleDeleteEmail" />
+            <Button text="Back" onAction="#handleBackButton" />
+        </HBox>
+    </bottom>
+</BorderPane>
