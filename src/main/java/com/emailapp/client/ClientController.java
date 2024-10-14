@@ -134,26 +134,16 @@ public class ClientController {
                 boolean isConnected = "PONG".equals(response);
                 Platform.runLater(() -> {
                     connectedProperty.set(isConnected);
-                    if (!isConnected) {
-                        showDisconnectionAlert();
-                    }
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     connectedProperty.set(false);
-                    showDisconnectionAlert();
                 });
             }
         });
     }
 
-    private void showDisconnectionAlert() {
-        Instant now = Instant.now();
-        if (ChronoUnit.SECONDS.between(lastAlertTime, now) >= ALERT_INTERVAL_SECONDS) {
-            handleConnectionError(new Exception("Server disconnected"));
-            lastAlertTime = now;
-        }
-    }
+
 
     public void setEmailAddress(String emailAddress) {
         mailbox.setEmailAddress(emailAddress);
@@ -292,15 +282,11 @@ public class ClientController {
 
         executorService.submit(() -> {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                // Rimuoviamo il salvataggio locale dell'email
-                // EmailFileManager.saveEmail(email, mailbox.getEmailAddress());
                 NetworkUtils.sendObject(socket, "SEND_EMAIL");
                 NetworkUtils.sendObject(socket, email);
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
                     Platform.runLater(() -> {
-                        // Non aggiungiamo più l'email alla mailbox locale
-                        // mailbox.addSentEmail(email);
                         composeView.setVisible(false);
                         clearComposeFields();
                         showInfoAlert("Email Sent", "Your email has been sent successfully.");
@@ -321,8 +307,7 @@ public class ClientController {
 
     private void fetchNewEmails() {
         if (!isConnected()) {
-            showServerClosedAlert();
-            return;
+            return;  // Silently return if not connected
         }
 
         executorService.submit(() -> {
@@ -345,7 +330,7 @@ public class ClientController {
                     }
                 });
             } catch (ConnectException e) {
-                Platform.runLater(this::showServerClosedAlert);
+                // Silently handle disconnection
             } catch (Exception e) {
                 handleConnectionError(e);
             }
@@ -432,12 +417,11 @@ public class ClientController {
     private void handleConnectionError(Exception e) {
         Platform.runLater(() -> {
             connectedProperty.set(false);
-            showErrorAlert("Connection Error", "Failed to connect to the server: " + e.getMessage() + "\nPlease try again later.");
         });
     }
 
     private void showServerClosedAlert() {
-        showErrorAlert("Server Closed", "The server is currently closed. Please try again later.");
+        showErrorAlert("Server Chiuso", "Attualmente il server è chiuso. Impossibile inviare e ricevere");
     }
 
     private void showErrorAlert(String title, String content) {
