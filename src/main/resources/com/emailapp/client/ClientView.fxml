@@ -18,8 +18,9 @@
             </top>
 
             <center>
-                <HBox spacing="10"> <!-- Change center to HBox -->
-                    <TableView fx:id="emailTableView" onMouseClicked="#handleEmailSelection">
+                <HBox spacing="10">
+                    <TableView fx:id="emailTableView" onMouseClicked="#handleEmailSelection"
+                               HBox.hgrow="ALWAYS" prefWidth="300" prefHeight="400">
                         <columns>
                             <TableColumn fx:id="senderColumn" text="Sender" />
                             <TableColumn fx:id="subjectColumn" text="Subject" />
@@ -27,15 +28,12 @@
                         </columns>
                     </TableView>
 
-                    <!-- This will contain either the email detail or compose view -->
-                    <StackPane fx:id="detailOrComposeStack" style="-fx-padding: 10;">
-                        <!-- Email Details -->
+                    <StackPane fx:id="detailOrComposeStack" style="-fx-padding: 10;" HBox.hgrow="ALWAYS">
                         <TextFlow fx:id="emailDetailFlow" visible="false">
                             <Label fx:id="emailDetailLabel" wrapText="true" />
                         </TextFlow>
 
-                        <!-- Compose View -->
-                        <VBox fx:id="composeView" visible="false" spacing="10" maxWidth="400" maxHeight="500">
+                        <VBox fx:id="composeView" visible="false" spacing="10">
                             <padding>
                                 <Insets top="20" right="20" bottom="20" left="20"/>
                             </padding>
@@ -51,8 +49,8 @@
                             <TextArea fx:id="bodyArea" VBox.vgrow="ALWAYS" promptText="Compose your email here..." />
 
                             <HBox spacing="10" alignment="CENTER_RIGHT">
-                                <Button text="Send" onAction="#handleSendEmail" />
-                                <Button text="Back" onAction="#handleCancelEmail" /> <!-- Back button -->
+                                <Button fx:id="sendButton" text="Send" onAction="#handleSendEmail" />
+                                <Button text="Back" onAction="#handleBackInCompose" />
                             </HBox>
                         </VBox>
                     </StackPane>
@@ -71,4 +69,3 @@
         </BorderPane>
     </VBox>
 </StackPane>
-
