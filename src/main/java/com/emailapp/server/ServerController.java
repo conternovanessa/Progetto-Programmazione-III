@@ -3,11 +3,14 @@ package com.emailapp.server;
 import com.emailapp.NetworkUtils;
 import com.emailapp.client.Email;
 import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -119,6 +122,9 @@ public class ServerController {
         executorService.shutdownNow();
         executorService = Executors.newCachedThreadPool(); // Create a new ExecutorService for future use
         logEvent("Server stopped");
+
+        // Notify the view controller that the server has stopped
+        Platform.runLater(() -> viewController.onServerStopped());
     }
 
     public void logEvent(String message) {
@@ -132,4 +138,28 @@ public class ServerController {
     public boolean isRunning() {
         return isRunning;
     }
+
+    public void handleStopServer() {
+        if (!isRunning) {
+            return;
+        }
+
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Stop Server");
+        confirmAlert.setHeaderText("Vuoi davvero chiudere il server?");
+        confirmAlert.setContentText("Questa operazione disconnetterà tutti i client attualmente connessi");
+
+        Optional<ButtonType> result = confirmAlert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            stopServer();
+
+            Alert infoAlert = new Alert(Alert.AlertType.INFORMATION);
+            infoAlert.setTitle("Server chiuso");
+            infoAlert.setHeaderText(null);
+            infoAlert.setContentText("Il server è stato chiuso correttamente. Tutti i client sono stati disconnessi");
+            infoAlert.showAndWait();
+        }
+    }
+
+
 }
