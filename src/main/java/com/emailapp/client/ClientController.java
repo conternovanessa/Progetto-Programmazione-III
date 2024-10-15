@@ -298,7 +298,7 @@ public class ClientController {
                     Platform.runLater(() -> {
                         composeView.setVisible(false);
                         clearComposeFields();
-                        showInfoAlert("Email Sent", "Your email has been sent successfully.");
+                        //showInfoAlert("Email Sent", "Your email has been sent successfully.");
                     });
                 } else {
                     Platform.runLater(() -> showErrorAlert("Send Error", "Failed to send email: " + response));
@@ -336,7 +336,8 @@ public class ClientController {
                         }
                         if (newEmailCount > 0) {
                             refreshEmailTable();
-                            showInfoAlert("New Emails", "Received " + newEmailCount + " new email(s)");
+                            showInfoAlert("New Emails for: " + mailbox.getEmailAddress(),
+                                    "Received " + newEmailCount + " new email(s)");
                         }
                     }
                 });
@@ -347,7 +348,6 @@ public class ClientController {
             }
         });
     }
-
     @FXML
     private void handleReplyEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
