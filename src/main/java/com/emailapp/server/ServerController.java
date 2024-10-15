@@ -104,6 +104,7 @@ public class ServerController {
         logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId);
     }
 
+
     public void stopServer() {
         if (!isRunning) {
             return;

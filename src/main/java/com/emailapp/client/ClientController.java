@@ -361,8 +361,31 @@ public class ClientController {
 
             // Make sure the compose view is in the StackPane
             detailOrComposeStack.getChildren().setAll(composeView);
+
+            // Set the fields for reply
+            toField.setText(selectedEmail.getSender());
+            toField.setEditable(false);
+            subjectField.setText("RE: " + selectedEmail.getSubject());
+
+            String originalBody = selectedEmail.getBody();
+            String quotedBody = originalBody.lines()
+                    .map(line -> "> " + line)
+                    .collect(Collectors.joining("\n"));
+            String headerLine = String.format("On %s, %s wrote:",
+                    selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                    selectedEmail.getSender());
+
+            // Add a clear separation and position the cursor
+            bodyArea.setText("\n\n" + // Empty lines for the new reply
+                    "-----Original Message-----\n" +
+                    headerLine + "\n" +
+                    quotedBody);
+
+            // Place the cursor at the beginning of the body
+            bodyArea.positionCaret(0);
         }
     }
+
 
     @FXML
     private void handleReplyAllEmail() {
@@ -379,6 +402,7 @@ public class ClientController {
             openComposeWindow(selectedEmail, "Forward");
         }
     }
+
 
     @FXML
     private void handleDeleteEmail() {
@@ -397,6 +421,7 @@ public class ClientController {
             showErrorAlert("Nessuna email selezionata", "Seleziona un'email da eliminare.");
         }
     }
+
     private void openComposeWindow(Email selectedEmail, String mode) {
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
@@ -492,38 +517,35 @@ public class ClientController {
         detailOrComposeStack.requestLayout();
     }
 
-    private synchronized void deleteEmail(Email email) {
+    private void deleteEmail(Email email) {
         if (!isConnected()) {
             showServerClosedAlert();
             return;
         }
 
-        executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-                NetworkUtils.sendObject(socket, email.getId());
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> {
-                        synchronized (lock) {
-                            mailbox.removeEmail(email);
-                            refreshEmailTable();
-                            showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
-                            returnToEmailListView();
-                        }
-                    });
-                    EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
-                } else {
-                    Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
-                }
-            } catch (ConnectException e) {
-                Platform.runLater(this::showServerClosedAlert);
-            } catch (Exception e) {
-                handleConnectionError(e);
-                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "DELETE_EMAIL");
+            NetworkUtils.sendObject(socket, email.getId());
+            String response = (String) NetworkUtils.receiveObject(socket);
+            if ("SUCCESS".equals(response)) {
+                Platform.runLater(() -> {
+                    mailbox.removeEmail(email);
+                    refreshEmailTable();
+                    showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
+                    returnToEmailListView();
+                });
+                EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
+            } else {
+                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
             }
-        });
+        } catch (ConnectException e) {
+            Platform.runLater(this::showServerClosedAlert);
+        } catch (Exception e) {
+            handleConnectionError(e);
+            Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
+        }
     }
+
 
     public boolean isConnected() {
         return connectedProperty.get();

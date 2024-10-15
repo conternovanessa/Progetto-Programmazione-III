@@ -171,9 +171,11 @@ public class Mailbox {
     }
 
     public synchronized void removeEmail(Email email) {
-        removeReceivedEmail(email);
-        removeSentEmail(email);
+        receivedEmails.removeIf(e -> e.getId().equals(email.getId()));
+        sentEmails.removeIf(e -> e.getId().equals(email.getId()));
     }
+
+
 
     public synchronized boolean hasEmail(String emailId) {
         return receivedEmails.stream().anyMatch(e -> e.getId().equals(emailId)) ||
