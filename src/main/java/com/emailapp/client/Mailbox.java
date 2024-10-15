@@ -21,28 +21,32 @@ public class Mailbox {
     private ObservableList<Email> sentEmails;
     private ExecutorService executorService;
     private Runnable emailLoadedCallback;
+    private final Object lock = new Object();
 
     public Mailbox(String emailAddress) {
         this.emailAddress = emailAddress;
         this.receivedEmails = FXCollections.observableArrayList();
         this.sentEmails = FXCollections.observableArrayList();
         this.executorService = Executors.newCachedThreadPool();
+
     }
 
-    public void loadEmailsFromDisk() {
+    public synchronized void loadEmailsFromDisk() {
         executorService.submit(() -> {
             try {
                 System.out.println("Loading emails for: " + emailAddress);
                 List<Email> loadedEmails = EmailFileManager.loadEmails(emailAddress);
                 System.out.println("Loaded " + loadedEmails.size() + " emails");
                 Platform.runLater(() -> {
-                    clearAllEmails();
-                    for (Email email : loadedEmails) {
-                        addReceivedEmail(email);
-                    }
-                    System.out.println("Total emails after loading: " + getTotalEmailCount());
-                    if (emailLoadedCallback != null) {
-                        emailLoadedCallback.run();
+                    synchronized (lock) {
+                        clearAllEmails();
+                        for (Email email : loadedEmails) {
+                            addReceivedEmail(email);
+                        }
+                        System.out.println("Total emails after loading: " + getTotalEmailCount());
+                        if (emailLoadedCallback != null) {
+                            emailLoadedCallback.run();
+                        }
                     }
                 });
             } catch (IOException e) {
@@ -66,9 +70,8 @@ public class Mailbox {
     }
 
 
-    public void sendEmail(Email email) {
+    public synchronized void sendEmail(Email email) {
         if (email.isEmpty()) {
-            // Note: Error handling should be done in the UI layer
             return;
         }
 
@@ -79,17 +82,19 @@ public class Mailbox {
                 NetworkUtils.sendObject(socket, email);
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> addSentEmail(email));
-                } else {
-                    // Note: Error handling should be done in the UI layer
+                    Platform.runLater(() -> {
+                        synchronized (lock) {
+                            addSentEmail(email);
+                        }
+                    });
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                // Note: Error handling should be done in the UI layer
             }
         });
     }
-    public void fetchNewEmails() {
+
+    public synchronized void fetchNewEmails() {
         executorService.submit(() -> {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
                 NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
@@ -97,14 +102,16 @@ public class Mailbox {
                 @SuppressWarnings("unchecked")
                 List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
                 Platform.runLater(() -> {
-                    for (Email email : newEmails) {
-                        if (!hasEmail(email.getId())) {
-                            addReceivedEmail(email);
+                    synchronized (lock) {
+                        for (Email email : newEmails) {
+                            if (!hasEmail(email.getId())) {
+                                addReceivedEmail(email);
+                            }
                         }
                     }
                 });
             } catch (Exception e) {
-                // Note: Error handling should be done in the UI layer
+                e.printStackTrace();
             }
         });
     }
@@ -127,7 +134,7 @@ public class Mailbox {
         return sentEmails;
     }
 
-    public void addReceivedEmail(Email email) {
+    public synchronized void addReceivedEmail(Email email) {
         if (!hasEmail(email.getId())) {
             receivedEmails.add(email);
         }
@@ -138,7 +145,7 @@ public class Mailbox {
         sentEmails.clear();
     }
 
-    public void addSentEmail(Email email) {
+    public synchronized void addSentEmail(Email email) {
         if (!hasEmail(email.getId())) {
             sentEmails.add(email);
         }
@@ -163,12 +170,12 @@ public class Mailbox {
         return receivedEmails.size() + sentEmails.size();
     }
 
-    public void removeEmail(Email email) {
+    public synchronized void removeEmail(Email email) {
         removeReceivedEmail(email);
         removeSentEmail(email);
     }
 
-    public boolean hasEmail(String emailId) {
+    public synchronized boolean hasEmail(String emailId) {
         return receivedEmails.stream().anyMatch(e -> e.getId().equals(emailId)) ||
                 sentEmails.stream().anyMatch(e -> e.getId().equals(emailId));
     }
@@ -186,23 +193,26 @@ public class Mailbox {
         sentEmails.clear();
     }
 
-    public void deleteEmail(Email email) {
+    public synchronized void deleteEmail(Email email) {
         executorService.submit(() -> {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
                 NetworkUtils.sendObject(socket, "DELETE_EMAIL");
                 NetworkUtils.sendObject(socket, email.getId());
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> removeEmail(email));
+                    Platform.runLater(() -> {
+                        synchronized (lock) {
+                            removeEmail(email);
+                        }
+                    });
                     EmailFileManager.deleteEmail(email.getId(), emailAddress);
-                } else {
-                    // Note: Error handling should be done in the UI layer
                 }
             } catch (Exception e) {
-                // Note: Error handling should be done in the UI layer
+                e.printStackTrace();
             }
         });
     }
+
 
     @Override
     public String toString() {

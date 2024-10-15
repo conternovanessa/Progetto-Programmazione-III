@@ -59,6 +59,7 @@ public class ClientController {
     private final BooleanProperty connectedProperty;
     private Instant lastAlertTime = Instant.MIN;
     private Set<String> validEmails;
+    private final Object lock = new Object();
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -230,12 +231,11 @@ public class ClientController {
 
 
     @FXML
-    private void handleSendEmail() {
+    private synchronized void handleSendEmail() {
         if (validateFields()) {
             String recipientsString = toField.getText().trim();
             List<String> recipients = Arrays.asList(recipientsString.split("\\s*,\\s*"));
 
-            // Validazione degli indirizzi email
             boolean allValid = recipients.stream().allMatch(this::isValidRecipient);
 
             if (!allValid) {
@@ -248,13 +248,18 @@ public class ClientController {
             newEmail.setRecipients(recipients);
             newEmail.setSubject(subjectField.getText());
             newEmail.setBody(bodyArea.getText());
-            sendEmail(newEmail);
+
+            synchronized (lock) {
+                sendEmail(newEmail);
+            }
+
             composeView.setVisible(false);
             clearComposeFields();
 
             returnToEmailListView();
         }
     }
+
 
     private boolean isValidRecipient(String email) {
         return validEmails.contains(email.trim());
@@ -283,7 +288,7 @@ public class ClientController {
         return true;
     }
 
-    private void sendEmail(Email email) {
+    private synchronized void sendEmail(Email email) {
         if (!isConnected()) {
             showServerClosedAlert();
             return;
@@ -296,15 +301,11 @@ public class ClientController {
 
         executorService.submit(() -> {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                // Rimuoviamo il salvataggio locale dell'email
-                // EmailFileManager.saveEmail(email, mailbox.getEmailAddress());
                 NetworkUtils.sendObject(socket, "SEND_EMAIL");
                 NetworkUtils.sendObject(socket, email);
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
                     Platform.runLater(() -> {
-                        // Non aggiungiamo più l'email alla mailbox locale
-                        // mailbox.addSentEmail(email);
                         composeView.setVisible(false);
                         clearComposeFields();
                         showInfoAlert("Email Sent", "Your email has been sent successfully.");
@@ -323,7 +324,7 @@ public class ClientController {
     }
 
 
-    private void fetchNewEmails() {
+    private synchronized void fetchNewEmails() {
         if (!isConnected()) {
             showServerClosedAlert();
             return;
@@ -336,16 +337,18 @@ public class ClientController {
                 @SuppressWarnings("unchecked")
                 List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
                 Platform.runLater(() -> {
-                    int newEmailCount = 0;
-                    for (Email email : newEmails) {
-                        if (!mailbox.hasEmail(email.getId())) {
-                            mailbox.addReceivedEmail(email);
-                            newEmailCount++;
+                    synchronized (lock) {
+                        int newEmailCount = 0;
+                        for (Email email : newEmails) {
+                            if (!mailbox.hasEmail(email.getId())) {
+                                mailbox.addReceivedEmail(email);
+                                newEmailCount++;
+                            }
                         }
-                    }
-                    if (newEmailCount > 0) {
-                        refreshEmailTable();
-                        showInfoAlert("New Emails", "Received " + newEmailCount + " new email(s)");
+                        if (newEmailCount > 0) {
+                            refreshEmailTable();
+                            showInfoAlert("New Emails", "Received " + newEmailCount + " new email(s)");
+                        }
                     }
                 });
             } catch (ConnectException e) {
@@ -500,7 +503,7 @@ public class ClientController {
         detailOrComposeStack.requestLayout();
     }
 
-    private void deleteEmail(Email email) {
+    private synchronized void deleteEmail(Email email) {
         if (!isConnected()) {
             showServerClosedAlert();
             return;
@@ -513,10 +516,12 @@ public class ClientController {
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if ("SUCCESS".equals(response)) {
                     Platform.runLater(() -> {
-                        mailbox.removeEmail(email);
-                        refreshEmailTable();
-                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
-                        returnToEmailListView();
+                        synchronized (lock) {
+                            mailbox.removeEmail(email);
+                            refreshEmailTable();
+                            showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
+                            returnToEmailListView();
+                        }
                     });
                     EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
                 } else {
