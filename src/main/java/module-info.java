@@ -1,6 +1,7 @@
 module com.emailapp {
     requires javafx.controls;
     requires javafx.fxml;
+    requires java.desktop;
 
     opens com.emailapp to javafx.fxml;
     opens com.emailapp.server to javafx.fxml;
