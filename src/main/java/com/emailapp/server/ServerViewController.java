@@ -6,8 +6,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 
 public class ServerViewController {
-
-    @FXML private Label portLabel;    // Sostituito TextField con Label
+    @FXML private Label portLabel;
     @FXML private Button startStopButton;
     @FXML private TextArea logTextArea;
 
@@ -20,15 +19,15 @@ public class ServerViewController {
 
     @FXML
     private void initialize() {
-        portLabel.setText("5000");   // Imposta la porta come testo della label
+        portLabel.setText("5000");
     }
 
     @FXML
     private void handleStartStop() {
         if (serverController.isRunning()) {
-            serverController.stopServer();
+            serverController.handleStopServer(); // Usa il nuovo metodo handleStopServer
         } else {
-            int port = Integer.parseInt(portLabel.getText());  // Usa la label per ottenere la porta
+            int port = Integer.parseInt(portLabel.getText());
             serverController.startServer(port);
         }
         updateButtonState();
@@ -45,5 +44,10 @@ public class ServerViewController {
             startStopButton.setText("Start Server");
         }
     }
-}
 
+    // Aggiungi questo nuovo metodo
+    public void onServerStopped() {
+        startStopButton.setText("Start Server");
+        // Altre modifiche all'interfaccia utente se necessarie
+    }
+}

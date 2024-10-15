@@ -72,6 +72,7 @@ public class ClientController {
     public void initialize() {
         mailbox.setEmailLoadedCallback(this::refreshEmailTable);
         senderColumn.setCellValueFactory(new PropertyValueFactory<>("sender"));
+        senderColumn.setCellFactory(column -> createBoldCell());  // Nuova riga
         subjectColumn.setCellValueFactory(new PropertyValueFactory<>("subject"));
         dateColumn.setCellValueFactory(cellData -> {
             Email email = cellData.getValue();
@@ -95,6 +96,27 @@ public class ClientController {
         startConnectionChecker();
         loadEmailsFromDisk();
         setupAutoRefresh();
+    }
+
+    private TableCell<Email, String> createBoldCell() {
+        return new TableCell<Email, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    Email email = getTableView().getItems().get(getIndex());
+                    if (!email.isRead()) {
+                        setStyle("-fx-font-weight: bold;");
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        };
     }
 
     private void refreshEmailTable() {
