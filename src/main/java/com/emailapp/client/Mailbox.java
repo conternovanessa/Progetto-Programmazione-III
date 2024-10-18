@@ -96,33 +96,6 @@ public class Mailbox {
         });
     }
 
-    public synchronized void fetchNewEmails() {
-        executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
-                NetworkUtils.sendObject(socket, emailAddress);
-                @SuppressWarnings("unchecked")
-                List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
-                Platform.runLater(() -> {
-                    synchronized (lock) {
-                        for (Email email : newEmails) {
-                            if (!hasEmail(email.getId())) {
-                                addReceivedEmail(email);
-                            }
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
-    public void shutdown() {
-        if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdownNow();
-        }
-    }
 
     public String getEmailAddress() {
         return emailAddress;
@@ -137,7 +110,7 @@ public class Mailbox {
     }
 
     public synchronized void addReceivedEmail(Email email) {
-        if (!hasEmail(email.getId())) {
+        if (!hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
             receivedEmails.add(email);
         }
     }
@@ -148,18 +121,11 @@ public class Mailbox {
     }
 
     public synchronized void addSentEmail(Email email) {
-        if (!hasEmail(email.getId())) {
+        if (!hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
             sentEmails.add(email);
         }
     }
 
-    public void removeReceivedEmail(Email email) {
-        receivedEmails.removeIf(e -> e.getId().equals(email.getId()));
-    }
-
-    public void removeSentEmail(Email email) {
-        sentEmails.removeIf(e -> e.getId().equals(email.getId()));
-    }
 
     public ObservableList<Email> getAllEmails() {
         ObservableList<Email> allEmails = FXCollections.observableArrayList();
@@ -173,48 +139,22 @@ public class Mailbox {
     }
 
     public synchronized void removeEmail(Email email) {
-        receivedEmails.removeIf(e -> e.getId().equals(email.getId()));
-        sentEmails.removeIf(e -> e.getId().equals(email.getId()));
+        receivedEmails.removeIf(e -> e.getId() == email.getId());
+        sentEmails.removeIf(e -> e.getId() == email.getId());
     }
 
 
 
-    public synchronized boolean hasEmail(String emailId) {
-        return receivedEmails.stream().anyMatch(e -> e.getId().equals(emailId)) ||
-                sentEmails.stream().anyMatch(e -> e.getId().equals(emailId));
+    public synchronized boolean hasEmail(long emailId) {
+        return receivedEmails.stream().anyMatch(e -> e.getId() == emailId) ||
+                sentEmails.stream().anyMatch(e -> e.getId() == emailId);
     }
 
-    public Email getEmailById(String emailId) {
-        return getAllEmails().stream()
-                .filter(e -> e.getId().equals(emailId))
-                .findFirst()
-                .orElse(null);
-    }
 
 
     public void clearAllEmails() {
         receivedEmails.clear();
         sentEmails.clear();
-    }
-
-    public synchronized void deleteEmail(Email email) {
-        executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-                NetworkUtils.sendObject(socket, email.getId());
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> {
-                        synchronized (lock) {
-                            removeEmail(email);
-                        }
-                    });
-                    EmailFileManager.deleteEmail(email.getId(), emailAddress);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
     }
 
 

@@ -35,8 +35,8 @@ public class EmailAccount {
         sent.add(email);
     }
 
-    public boolean removeEmail(String emailId) {
-        return inbox.removeIf(email -> email.getId().equals(emailId)) ||
-                sent.removeIf(email -> email.getId().equals(emailId));
+    public boolean removeEmail(long emailId) {
+        return inbox.removeIf(email -> email.getId() == emailId) ||
+                sent.removeIf(email -> email.getId() == emailId);
     }
 }

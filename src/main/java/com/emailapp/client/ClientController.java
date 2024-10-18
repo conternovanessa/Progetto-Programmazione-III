@@ -93,6 +93,7 @@ public class ClientController {
             connectionStatusLabel.setStyle(newValue ? "-fx-text-fill: green;" : "-fx-text-fill: red;");
         });
 
+        emailTableView.setVisible(true);
         startConnectionChecker();
         loadEmailsFromDisk();
         setupAutoRefresh();
@@ -203,6 +204,8 @@ public class ClientController {
                 "Date: " + email.getSentDate().toString() + "\n" +
                 "Body: " + email.getBody().trim().replaceAll("\\s+", " ");
 
+        emailTableView.setVisible(true); // Ensure table view remains visible
+        detailOrComposeStack.getChildren().setAll(emailDetailFlow);
         emailDetailLabel.setText(emailDetails); // Update the email detail label
     }
 
@@ -215,10 +218,21 @@ public class ClientController {
 
     @FXML
     private void handleBackButton() {
-        emailDetailFlow.setVisible(false); // Hide email details
-        composeView.setVisible(false); // Ensure compose view is hidden as well
-        actionButtons.setVisible(false); // Hide action buttons
-        emailTableView.setVisible(true); // Show the email list view again
+        // Hide email details and compose view
+        emailDetailFlow.setVisible(false);
+        composeView.setVisible(false);
+
+        // Hide action buttons
+        actionButtons.setVisible(false);
+
+        // Ensure the email table view is visible
+        emailTableView.setVisible(true);
+
+        // Clear the right side of the interface
+        detailOrComposeStack.getChildren().clear();
+
+        // Refresh the email table
+        refreshEmailTable();
     }
 
     private void loadEmailsFromDisk() {
@@ -351,7 +365,7 @@ public class ClientController {
                     synchronized (lock) {
                         int newEmailCount = 0;
                         for (Email email : newEmails) {
-                            if (!mailbox.hasEmail(email.getId())) {
+                            if (!mailbox.hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
                                 mailbox.addReceivedEmail(email);
                                 newEmailCount++;
                             }
@@ -375,38 +389,9 @@ public class ClientController {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
             openComposeWindow(selectedEmail, "Reply");
-
-            // Ensure the compose view is visible
-            emailDetailFlow.setVisible(false);
-            emailTableView.setVisible(false);
-            composeView.setVisible(true);
-
-            // Make sure the compose view is in the StackPane
-            detailOrComposeStack.getChildren().setAll(composeView);
-
-            // Set the fields for reply
-            toField.setText(selectedEmail.getSender());
-            toField.setEditable(false);
-            subjectField.setText("RE: " + selectedEmail.getSubject());
-
-            String originalBody = selectedEmail.getBody();
-            String quotedBody = originalBody.lines()
-                    .map(line -> "> " + line)
-                    .collect(Collectors.joining("\n"));
-            String headerLine = String.format("On %s, %s wrote:",
-                    selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
-                    selectedEmail.getSender());
-
-            // Add a clear separation and position the cursor
-            bodyArea.setText("\n\n" + // Empty lines for the new reply
-                    "-----Original Message-----\n" +
-                    headerLine + "\n" +
-                    quotedBody);
-
-            // Place the cursor at the beginning of the body
-            bodyArea.positionCaret(0);
         }
     }
+
 
 
     @FXML
@@ -443,6 +428,43 @@ public class ClientController {
             showErrorAlert("Nessuna email selezionata", "Seleziona un'email da eliminare.");
         }
     }
+
+    private void deleteEmail(Email email) {
+        if (!isConnected()) {
+            showServerClosedAlert();
+            return;
+        }
+
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "DELETE_EMAIL");
+            NetworkUtils.sendObject(socket, email.getId());
+            String response = (String) NetworkUtils.receiveObject(socket);
+            if ("SUCCESS".equals(response)) {
+                Platform.runLater(() -> {
+                    mailbox.removeEmail(email);
+                    refreshEmailTable();
+
+                    // Delete the email from the file system
+                    try {
+                        EmailFileManager.deleteEmail(String.valueOf(email.getId()), mailbox.getEmailAddress());
+                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo dal server e dal file system.");
+                    } catch (IOException e) {
+                        showErrorAlert("Errore di eliminazione", "L'email è stata eliminata dal server, ma non è stato possibile eliminarla dal file system: " + e.getMessage());
+                    }
+
+                    returnToEmailListView();
+                });
+            } else {
+                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
+            }
+        } catch (ConnectException e) {
+            Platform.runLater(this::showServerClosedAlert);
+        } catch (Exception e) {
+            handleConnectionError(e);
+            Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
+        }
+    }
+
 
     private void openComposeWindow(Email selectedEmail, String mode) {
         composeView.setVisible(true);
@@ -493,7 +515,7 @@ public class ClientController {
             bodyArea.positionCaret(0);
         }
 
-        // Ensure the compose view takes up the same space as the email detail view
+        emailTableView.setVisible(true); // Ensure table view remains visible
         detailOrComposeStack.getChildren().setAll(composeView);
         composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
         composeView.prefHeightProperty().bind(detailOrComposeStack.heightProperty());
@@ -502,7 +524,6 @@ public class ClientController {
             handleSendEmail();
             returnToEmailListView();
         });
-        handleBackInCompose();
     }
 
     @FXML
@@ -516,12 +537,11 @@ public class ClientController {
         emailDetailFlow.setVisible(false);
         actionButtons.setVisible(false);
 
-        // Show email table view
+        // Show email table view (should already be visible, but ensure it is)
         emailTableView.setVisible(true);
 
-        // Ensure the email table view is the only child of the detailOrComposeStack
+        // Clear the right side of the interface
         detailOrComposeStack.getChildren().clear();
-        detailOrComposeStack.getChildren().add(emailTableView);
 
         // Reset the layout
         emailTableView.setManaged(true);
@@ -538,36 +558,6 @@ public class ClientController {
         emailTableView.requestLayout();
         detailOrComposeStack.requestLayout();
     }
-
-    private void deleteEmail(Email email) {
-        if (!isConnected()) {
-            showServerClosedAlert();
-            return;
-        }
-
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-            NetworkUtils.sendObject(socket, email.getId());
-            String response = (String) NetworkUtils.receiveObject(socket);
-            if ("SUCCESS".equals(response)) {
-                Platform.runLater(() -> {
-                    mailbox.removeEmail(email);
-                    refreshEmailTable();
-                    showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
-                    returnToEmailListView();
-                });
-                EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
-            } else {
-                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
-            }
-        } catch (ConnectException e) {
-            Platform.runLater(this::showServerClosedAlert);
-        } catch (Exception e) {
-            handleConnectionError(e);
-            Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
-        }
-    }
-
 
     public boolean isConnected() {
         return connectedProperty.get();

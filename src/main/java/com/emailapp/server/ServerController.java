@@ -102,7 +102,7 @@ public class ServerController {
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
         String emailId = (String) NetworkUtils.receiveObject(clientSocket);
-        boolean success = mailServer.deleteEmail(emailId);
+        boolean success = mailServer.deleteEmail(Long.parseLong(emailId));
         NetworkUtils.sendObject(clientSocket, success ? "SUCCESS" : "FAILURE");
         logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId);
     }

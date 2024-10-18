@@ -20,7 +20,6 @@ public class MailServer {
         accounts.putIfAbsent(emailAddress, new EmailAccount(emailAddress));
     }
 
-
     public void sendEmail(Email email) {
         String sender = email.getSender();
         List<String> recipients = email.getRecipients();
@@ -50,15 +49,21 @@ public class MailServer {
         }
     }
 
-
     public List<Email> getNewEmails(String recipient) {
         createAccount(recipient);
         return new ArrayList<>(accounts.get(recipient).getInbox());
     }
 
-    public boolean deleteEmail(String emailId) {
+    public boolean deleteEmail(long emailId) {
         for (EmailAccount account : accounts.values()) {
             if (account.removeEmail(emailId)) {
+                try {
+                    // Assumendo che EmailFileManager abbia un metodo per eliminare l'email utilizzando l'ID long
+                    EmailFileManager.deleteEmail(String.valueOf(emailId), account.getEmailAddress());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // Considera di gestire questo errore in modo appropriato
+                }
                 return true;
             }
         }

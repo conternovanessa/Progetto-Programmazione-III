@@ -7,7 +7,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class Email implements Serializable {
-    private String id;
+    private static long lastAssignedId = 0;
+    private final long id;
     private String sender;
     private List<String> recipients;
     private String subject;
@@ -32,11 +33,11 @@ public class Email implements Serializable {
         this.body = body;
     }
 
-    private String generateId() {
-        return System.currentTimeMillis() + "-" + Math.random();
+    private synchronized static long generateId() {
+        return ++lastAssignedId;
     }
 
-    public String getId() {
+    public long getId() {
         return id;
     }
 
@@ -123,43 +124,13 @@ public class Email implements Serializable {
                 this.recipients.isEmpty();
     }
 
-    /*public Email createReply() {
-        Email reply = new Email();
-        reply.addRecipient(this.sender);
-        reply.setSubject("Re: " + this.subject);
-        reply.setBody("\n\nOn " + this.sentDate + ", " + this.sender + " wrote:\n" + this.body);
-        return reply;
-    }*/
-
-    /*public Email createReplyAll() {
-        Email replyAll = createReply();
-        for (String recipient : this.recipients) {
-            if (!recipient.equals(this.sender)) {
-                replyAll.addRecipient(recipient);
-            }
-        }
-        return replyAll;
-    }*/
-
-    /*public Email createForward() {
-        Email forward = new Email();
-        forward.setSubject("Fwd: " + this.subject);
-        forward.setBody("\n\n---------- Forwarded message ---------\n" +
-                "From: " + this.sender + "\n" +
-                "Date: " + this.sentDate + "\n" +
-                "Subject: " + this.subject + "\n" +
-                "To: " + String.join(", ", this.recipients) + "\n\n" +
-                this.body);
-        forward.attachments.addAll(this.attachments);
-        return forward;
-    }*/
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Email email = (Email) o;
-        return Objects.equals(id, email.id);
+        return id == email.id;
     }
 
     @Override
