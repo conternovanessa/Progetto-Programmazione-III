@@ -31,6 +31,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import static com.emailapp.EmailFileManager.markEmailAsRead;
+
 public class ClientController {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
@@ -71,14 +73,20 @@ public class ClientController {
     @FXML
     public void initialize() {
         mailbox.setEmailLoadedCallback(this::refreshEmailTable);
+
+        // Set up cell value factories for all columns
         senderColumn.setCellValueFactory(new PropertyValueFactory<>("sender"));
-        senderColumn.setCellFactory(column -> createBoldCell());  // Nuova riga
         subjectColumn.setCellValueFactory(new PropertyValueFactory<>("subject"));
         dateColumn.setCellValueFactory(cellData -> {
             Email email = cellData.getValue();
             String formattedDate = email.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
             return javafx.beans.binding.Bindings.createStringBinding(() -> formattedDate);
         });
+
+        // Set up cell factories for all columns
+        senderColumn.setCellFactory(this::createStyledCell);
+        subjectColumn.setCellFactory(this::createStyledCell);
+        dateColumn.setCellFactory(this::createStyledCell);
 
         emailTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         emailTableView.setItems(mailbox.getAllEmails());
@@ -97,6 +105,27 @@ public class ClientController {
         startConnectionChecker();
         loadEmailsFromDisk();
         setupAutoRefresh();
+    }
+
+    private <T> TableCell<Email, T> createStyledCell(TableColumn<Email, T> column) {
+        return new TableCell<Email, T>() {
+            @Override
+            protected void updateItem(T item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item.toString());
+                    Email email = getTableView().getItems().get(getIndex());
+                    if (!email.isRead()) {
+                        setStyle("-fx-font-weight: bold;");
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        };
     }
 
     private TableCell<Email, String> createBoldCell() {
@@ -181,13 +210,29 @@ public class ClientController {
     private void handleEmailSelection() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            displayEmailDetails(selectedEmail); // Display the selected email details
+            displayEmailDetails(selectedEmail);
+            if (!selectedEmail.isRead()) {
+                markEmailAsRead(selectedEmail);
+            }
             emailTableView.setVisible(false); // Hide the email table view when an email is selected
             composeView.setVisible(false); // Hide the compose view
             emailDetailFlow.setVisible(true); // Show email details
             actionButtons.setVisible(true); // Show action buttons
             detailOrComposeStack.getChildren().setAll(emailDetailFlow); // Ensure only email detail view is in the StackPane
         }
+    }
+
+    private void markEmailAsRead(Email email) {
+        email.setRead(true);
+        emailTableView.refresh();
+        executorService.submit(() -> {
+            try {
+                EmailFileManager.markEmailAsRead(String.valueOf(email.getId()), mailbox.getEmailAddress());
+            } catch (IOException e) {
+                e.printStackTrace();
+                Platform.runLater(() -> showErrorAlert("Error", "Failed to mark email as read"));
+            }
+        });
     }
 
     @FXML
@@ -435,34 +480,27 @@ public class ClientController {
             return;
         }
 
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-            NetworkUtils.sendObject(socket, email.getId());
-            String response = (String) NetworkUtils.receiveObject(socket);
-            if ("SUCCESS".equals(response)) {
-                Platform.runLater(() -> {
-                    mailbox.removeEmail(email);
-                    refreshEmailTable();
-
-                    // Delete the email from the file system
-                    try {
-                        EmailFileManager.deleteEmail(String.valueOf(email.getId()), mailbox.getEmailAddress());
-                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo dal server e dal file system.");
-                    } catch (IOException e) {
-                        showErrorAlert("Errore di eliminazione", "L'email è stata eliminata dal server, ma non è stato possibile eliminarla dal file system: " + e.getMessage());
-                    }
-
-                    returnToEmailListView();
-                });
-            } else {
-                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
+        executorService.submit(() -> {
+            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                NetworkUtils.sendObject(socket, "DELETE_EMAIL");
+                NetworkUtils.sendObject(socket, email.getId());
+                NetworkUtils.sendObject(socket, mailbox.getEmailAddress()); // Invia anche l'indirizzo email dell'utente
+                String response = (String) NetworkUtils.receiveObject(socket);
+                if ("SUCCESS".equals(response)) {
+                    Platform.runLater(() -> {
+                        mailbox.removeEmail(email);
+                        refreshEmailTable();
+                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
+                        returnToEmailListView();
+                    });
+                } else {
+                    Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
             }
-        } catch (ConnectException e) {
-            Platform.runLater(this::showServerClosedAlert);
-        } catch (Exception e) {
-            handleConnectionError(e);
-            Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
-        }
+        });
     }
 
 

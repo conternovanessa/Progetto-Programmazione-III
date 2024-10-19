@@ -23,7 +23,7 @@ public class ServerController {
     private static final int DEFAULT_PORT = 5000;
 
     public ServerController(ServerViewController viewController) {
-        this.mailServer = new MailServer();
+        this.mailServer = new MailServer(this);
         this.viewController = viewController;
         this.executorService = Executors.newCachedThreadPool();
         startServer(DEFAULT_PORT); // Start the server automatically
@@ -91,7 +91,7 @@ public class ServerController {
         Email email = (Email) NetworkUtils.receiveObject(clientSocket);
         mailServer.sendEmail(email);
         NetworkUtils.sendObject(clientSocket, "SUCCESS");
-        logEvent("Email sent from " + email.getSender() + " to " + email.getRecipients());
+        //logEvent("Email sent from " + email.getSender() + " to " + email.getRecipients());
     }
 
     private void handleFetchNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
@@ -101,10 +101,11 @@ public class ServerController {
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        String emailId = (String) NetworkUtils.receiveObject(clientSocket);
-        boolean success = mailServer.deleteEmail(Long.parseLong(emailId));
+        Long emailId = (Long) NetworkUtils.receiveObject(clientSocket);
+        String userEmail = (String) NetworkUtils.receiveObject(clientSocket);
+        boolean success = mailServer.deleteEmail(emailId, userEmail);
         NetworkUtils.sendObject(clientSocket, success ? "SUCCESS" : "FAILURE");
-        logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId);
+        logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId + " and user: " + userEmail);
     }
 
 

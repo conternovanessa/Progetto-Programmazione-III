@@ -36,16 +36,13 @@ public class Mailbox {
     public synchronized void loadEmailsFromDisk() {
         executorService.submit(() -> {
             try {
-                System.out.println("Loading emails for: " + emailAddress);
                 List<Email> loadedEmails = EmailFileManager.loadEmails(emailAddress);
-                System.out.println("Loaded " + loadedEmails.size() + " emails");
                 Platform.runLater(() -> {
                     synchronized (lock) {
                         clearAllEmails();
                         for (Email email : loadedEmails) {
                             addReceivedEmail(email);
                         }
-                        System.out.println("Total emails after loading: " + getTotalEmailCount());
                         if (emailLoadedCallback != null) {
                             emailLoadedCallback.run();
                         }

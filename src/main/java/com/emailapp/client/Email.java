@@ -2,128 +2,70 @@ package com.emailapp.client;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class Email implements Serializable {
-    private static long lastAssignedId = 0;
-    private final long id;
+    private static final long serialVersionUID = 1L;
+
+    private long id;
     private String sender;
     private List<String> recipients;
     private String subject;
     private String body;
     private LocalDateTime sentDate;
-    private boolean isRead;
-    private List<String> attachments;
+    private boolean deleted;
+    private boolean read;
 
     public Email() {
-        this.id = generateId();
-        this.recipients = new ArrayList<>();
         this.sentDate = LocalDateTime.now();
-        this.isRead = false;
-        this.attachments = new ArrayList<>();
+        this.deleted = false;
+        this.read = false;
     }
 
     public Email(String sender, List<String> recipients, String subject, String body) {
         this();
         this.sender = sender;
-        this.recipients = new ArrayList<>(recipients);
+        this.recipients = recipients;
         this.subject = subject;
         this.body = body;
     }
 
-    private synchronized static long generateId() {
-        return ++lastAssignedId;
-    }
+    // Getters
+    public long getId() { return id; }
+    public String getSender() { return sender; }
+    public List<String> getRecipients() { return recipients; }
+    public String getSubject() { return subject; }
+    public String getBody() { return body; }
+    public LocalDateTime getSentDate() { return sentDate; }
+    public boolean isDeleted() { return deleted; }
+    public boolean isRead() { return read; }
 
-    public long getId() {
-        return id;
-    }
-
-    public LocalDateTime getSentDate() {
-        return sentDate;
-    }
-    public String getSender() {
-        return sender;
-    }
-
-    public void setSender(String sender) {
-        this.sender = sender;
-    }
-
-    public String getSubject() {
-        return subject;
-    }
-
-    public void setSubject(String subject) {
-        this.subject = subject;
-    }
-
-    public String getBody() {
-        return body;
-    }
-
-    public void setBody(String body) {
-        this.body = body;
-    }
-
-    public List<String> getRecipients() {
-        return new ArrayList<>(this.recipients); // Ritorna una copia della lista dei destinatari
-    }
-
-    public void setRecipients(List<String> recipients) {
-        this.recipients = new ArrayList<>(recipients);
-    }
-
-
-    public boolean isRead() {
-        return isRead;
-    }
-
-    public void setRead(boolean read) {
-        isRead = read;
-    }
-
-    public List<String> getAttachments() {
-        return new ArrayList<>(attachments);
-    }
-
-    public void addAttachment(String attachment) {
-        this.attachments.add(attachment);
-    }
-
-    public void removeAttachment(String attachment) {
-        this.attachments.remove(attachment);
-    }
-
-    public boolean hasAttachments() {
-        return !this.attachments.isEmpty();
-    }
-
-    // Metodi aggiuntivi
-    public void addRecipient(String recipient) {
-        this.recipients.add(recipient);
-    }
-
-    public void removeRecipient(String recipient) {
-        this.recipients.remove(recipient);
-    }
-
-    public boolean hasRecipient(String recipient) {
-        return this.recipients.contains(recipient);
-    }
-
-    public int getRecipientCount() {
-        return this.recipients.size();
-    }
+    // Setters
+    public void setId(long id) { this.id = id; }
+    public void setSender(String sender) { this.sender = sender; }
+    public void setRecipients(List<String> recipients) { this.recipients = recipients; }
+    public void setSubject(String subject) { this.subject = subject; }
+    public void setBody(String body) { this.body = body; }
+    public void setSentDate(LocalDateTime sentDate) { this.sentDate = sentDate; }
+    public void setDeleted(boolean deleted) { this.deleted = deleted; }
+    public void setRead(boolean read) { this.read = read; }
 
     public boolean isEmpty() {
-        return (this.subject == null || this.subject.isEmpty()) &&
-                (this.body == null || this.body.isEmpty()) &&
-                this.recipients.isEmpty();
+        return sender == null && recipients == null && subject == null && body == null;
     }
 
+    @Override
+    public String toString() {
+        return "Email{" +
+                "id=" + id +
+                ", sender='" + sender + '\'' +
+                ", recipients=" + recipients +
+                ", subject='" + subject + '\'' +
+                ", sentDate=" + sentDate +
+                ", deleted=" + deleted +
+                ", read=" + read +
+                '}';
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -135,23 +77,6 @@ public class Email implements Serializable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id);
-    }
-
-    @Override
-    public String toString() {
-        return "Email{" +
-                "id='" + id + '\'' +
-                ", sender='" + sender + '\'' +
-                ", recipients=" + recipients +
-                ", subject='" + subject + '\'' +
-                ", sentDate=" + sentDate +
-                ", isRead=" + isRead +
-                ", hasAttachments=" + hasAttachments() +
-                '}';
-    }
-
-    public void setSentDate(LocalDateTime parse) {
-        this.sentDate = parse;
+        return Long.hashCode(id);
     }
 }
