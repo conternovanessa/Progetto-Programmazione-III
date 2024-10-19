@@ -69,14 +69,10 @@ public class EmailFileManager {
             String dateStr = reader.readLine().substring(6);
             boolean deleted = Boolean.parseBoolean(reader.readLine().substring(9));
             boolean read = Boolean.parseBoolean(reader.readLine().substring(6));
-            reader.readLine(); // Skip "Body:" line
-            StringBuilder body = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                body.append(line).append("\n");
-            }
+            String bodyLine = reader.readLine();
+            String body = bodyLine.substring(6); // Assume that "Body: " is always present
 
-            Email email = new Email(sender, recipients, subject, body.toString());
+            Email email = new Email(sender, recipients, subject, body);
             email.setSentDate(LocalDateTime.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             email.setDeleted(deleted);
             email.setRead(read);

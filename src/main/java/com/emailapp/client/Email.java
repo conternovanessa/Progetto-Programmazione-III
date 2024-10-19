@@ -79,4 +79,16 @@ public class Email implements Serializable {
     public int hashCode() {
         return Long.hashCode(id);
     }
+
+    public void printDebugInfo() {
+        System.out.println("Email Debug Info:");
+        System.out.println("From: " + getSender());
+        System.out.println("To: " + String.join(", ", getRecipients()));
+        System.out.println("Subject: " + getSubject());
+        System.out.println("Date: " + getSentDate());
+        System.out.println("Body: " + getBody());
+        System.out.println("Is Read: " + isRead());
+        System.out.println("Is Deleted: " + isDeleted());
+    }
 }
+

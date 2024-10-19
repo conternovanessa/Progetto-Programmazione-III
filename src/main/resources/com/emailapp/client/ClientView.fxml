@@ -22,12 +22,14 @@
                 </columns>
             </TableView>
             <StackPane fx:id="detailOrComposeStack">
-                <TextFlow fx:id="emailDetailFlow" visible="false">
-                    <padding>
-                        <Insets top="20" right="20" bottom="20" left="20"/>
-                    </padding>
-                    <Label fx:id="emailDetailLabel" wrapText="true" />
-                </TextFlow>
+                <ScrollPane fitToWidth="true" fitToHeight="true">
+                    <TextFlow fx:id="emailDetailFlow" visible="false">
+                        <padding>
+                            <Insets top="20" right="20" bottom="20" left="20"/>
+                        </padding>
+                        <TextArea fx:id="emailDetailTextArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS"/>
+                    </TextFlow>
+                </ScrollPane>
                 <VBox fx:id="composeView" visible="false" spacing="10">
                     <padding>
                         <Insets top="20" right="20" bottom="20" left="20"/>

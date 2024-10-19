@@ -54,6 +54,7 @@ public class ClientController {
     @FXML private VBox composeView; // For composing email
     @FXML private StackPane detailOrComposeStack; // The StackPane that contains both views
     @FXML private Button sendButton;
+    @FXML private TextArea emailDetailTextArea;
 
 
     private final Mailbox mailbox;
@@ -210,15 +211,11 @@ public class ClientController {
     private void handleEmailSelection() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
+            selectedEmail.printDebugInfo(); // Add this line for debugging
             displayEmailDetails(selectedEmail);
             if (!selectedEmail.isRead()) {
                 markEmailAsRead(selectedEmail);
             }
-            emailTableView.setVisible(false); // Hide the email table view when an email is selected
-            composeView.setVisible(false); // Hide the compose view
-            emailDetailFlow.setVisible(true); // Show email details
-            actionButtons.setVisible(true); // Show action buttons
-            detailOrComposeStack.getChildren().setAll(emailDetailFlow); // Ensure only email detail view is in the StackPane
         }
     }
 
@@ -243,15 +240,23 @@ public class ClientController {
     }
 
     private void displayEmailDetails(Email email) {
-        String emailDetails = "From: " + email.getSender() + "\n" +
-                "To: " + String.join(", ", email.getRecipients()) + "\n" +
-                "Subject: " + email.getSubject() + "\n" +
-                "Date: " + email.getSentDate().toString() + "\n" +
-                "Body: " + email.getBody().trim().replaceAll("\\s+", " ");
+        StringBuilder emailDetails = new StringBuilder();
+        emailDetails.append("From: ").append(email.getSender()).append("\n");
+        emailDetails.append("To: ").append(String.join(", ", email.getRecipients())).append("\n");
+        emailDetails.append("Subject: ").append(email.getSubject()).append("\n");
+        emailDetails.append("Date: ").append(email.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))).append("\n");
+        emailDetails.append("Body: ").append(email.getBody());
 
-        emailTableView.setVisible(true); // Ensure table view remains visible
+        emailTableView.setVisible(false);
         detailOrComposeStack.getChildren().setAll(emailDetailFlow);
-        emailDetailLabel.setText(emailDetails); // Update the email detail label
+        emailDetailTextArea.setText(emailDetails.toString());
+        emailDetailTextArea.setEditable(false);
+        emailDetailTextArea.setWrapText(true);
+        emailDetailFlow.setVisible(true);
+        actionButtons.setVisible(true);
+
+        // For debugging
+        System.out.println("Email body: " + email.getBody());
     }
 
     @FXML
