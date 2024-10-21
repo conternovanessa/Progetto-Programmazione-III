@@ -1,7 +1,0 @@
-From: fabiodelia@progetto.com
-To: vanessaconterno@progetto.com
-Subject: ses
-Date: 2024-10-19T15:52:33.512288900
-Deleted: false
-Read: true
-Body: sas

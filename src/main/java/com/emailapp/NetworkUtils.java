@@ -3,6 +3,7 @@ package com.emailapp;
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 public class NetworkUtils {
     private static ObjectOutputStream getOutputStream(Socket socket) throws IOException {
@@ -37,8 +38,13 @@ public class NetworkUtils {
         if (socket.isClosed()) {
             throw new SocketException("Socket is closed");
         }
-        ObjectInputStream in = getInputStream(socket);
-        return in.readObject();
-        // Non chiudere lo stream qui
+        try {
+            ObjectInputStream in = getInputStream(socket);
+            return in.readObject();
+        } catch (EOFException e) {
+            throw new SocketException("Connection closed while reading");
+        } catch (SocketTimeoutException e) {
+            throw new SocketException("Timeout while waiting for server response");
+        }
     }
 }

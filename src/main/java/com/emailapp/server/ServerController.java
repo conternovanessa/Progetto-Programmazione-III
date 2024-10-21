@@ -7,6 +7,8 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
@@ -59,24 +61,27 @@ public class ServerController {
 
     private void handleClient(Socket clientSocket) {
         try {
-            String command = (String) NetworkUtils.receiveObject(clientSocket);
-            switch (command) {
-                case "SEND_EMAIL":
-                    handleSendEmail(clientSocket);
-                    break;
-                case "FETCH_NEW_EMAILS":
-                    handleFetchNewEmails(clientSocket);
-                    break;
-                case "DELETE_EMAIL":
-                    handleDeleteEmail(clientSocket);
-                    break;
-                case "PING":
-                    NetworkUtils.sendObject(clientSocket, "PONG");
-                    break;
-                default:
-                    logEvent("Unknown command: " + command);
+            while (!clientSocket.isClosed()) {
+                String command = (String) NetworkUtils.receiveObject(clientSocket);
+                switch (command) {
+                    case "SEND_EMAIL":
+                        handleSendEmail(clientSocket);
+                        break;
+                    case "FETCH_NEW_EMAILS":
+                        handleFetchNewEmails(clientSocket);
+                        break;
+                    case "DELETE_EMAIL":
+                        handleDeleteEmail(clientSocket);
+                        break;
+                    case "PING":
+                        NetworkUtils.sendObject(clientSocket, "PONG");
+                        break;
+                    default:
+                        logEvent("Unknown command: " + command);
+                        break;
+                }
             }
-        } catch (Exception e) {
+        } catch (IOException | ClassNotFoundException e) {
             logEvent("Error handling client: " + e.getMessage());
         } finally {
             try {
@@ -101,17 +106,29 @@ public class ServerController {
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        Long emailId = (Long) NetworkUtils.receiveObject(clientSocket);
-        String userEmail = (String) NetworkUtils.receiveObject(clientSocket);
+        Long emailId = null;
+        String userEmail = null;
+        boolean success = false;
 
-        boolean success = mailServer.deleteEmail(Math.toIntExact(emailId), userEmail);
+        try {
+            emailId = (Long) NetworkUtils.receiveObject(clientSocket);
+            userEmail = (String) NetworkUtils.receiveObject(clientSocket);
 
-        NetworkUtils.sendObject(clientSocket, success ? "SUCCESS" : "FAILURE");
-        logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId + " and user: " + userEmail);
+            success = mailServer.deleteEmail(Math.toIntExact(emailId), userEmail);
+
+            NetworkUtils.sendObject(clientSocket, success);
+
+            logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId + " and user: " + userEmail);
+        } catch (Exception e) {
+            logEvent("Error during email deletion: " + e.getMessage());
+            NetworkUtils.sendObject(clientSocket, false);
+        } finally {
+            // Ensure we always send a response, even if an exception occurred
+            if (emailId == null || userEmail == null) {
+                NetworkUtils.sendObject(clientSocket, false);
+            }
+        }
     }
-
-
-
     public void stopServer() {
         if (!isRunning) {
             return;

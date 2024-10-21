@@ -19,6 +19,7 @@ import javafx.util.Duration;
 import java.io.*;
 import java.net.Socket;
 import java.net.ConnectException;
+import java.net.SocketException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -124,8 +125,11 @@ public class ClientController {
 
 
     private void refreshEmailTable() {
-        emailTableView.setItems(mailbox.getAllEmails());
-        emailTableView.refresh();
+        Platform.runLater(() -> {
+            emailTableView.setItems(null);
+            emailTableView.setItems(mailbox.getAllEmails());
+            emailTableView.refresh();
+        });
     }
 
     private void setupAutoRefresh() {
@@ -453,7 +457,7 @@ public class ClientController {
     private void deleteEmail(Email email) {
         executorService.submit(() -> {
             try {
-                // First, attempt to delete the email file locally
+                // Attempt to delete the email file locally
                 boolean locallyDeleted = EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
 
                 if (locallyDeleted) {
@@ -461,17 +465,20 @@ public class ClientController {
                     boolean deletedFromServer = deleteEmailFromServer(email);
 
                     Platform.runLater(() -> {
-                        // Remove the email from the mailbox and update the UI
+                        // Remove the email from the mailbox and update the UI regardless of server result
                         mailbox.removeEmail(email);
                         refreshEmailTable();
                         returnToEmailListView();
 
-                        // Show a single success alert
-                        showInfoAlert("Email Eliminata", "L'email è stata eliminata con successo.");
+                        if (deletedFromServer) {
+                            showInfoAlert("Email Eliminata", "L'email è stata eliminata con successo.");
+                        } else {
+                            showWarningAlert("Eliminazione Parziale", "L'email è stata eliminata localmente ma potrebbe non essere stata eliminata dal server.");
+                        }
                     });
                 } else {
                     Platform.runLater(() -> {
-                        showErrorAlert("Errore di Eliminazione", "Impossibile eliminare l'email. Riprova più tardi.");
+                        showErrorAlert("Errore di Eliminazione", "Impossibile eliminare l'email localmente. Riprova più tardi.");
                     });
                 }
             } catch (Exception e) {
@@ -484,17 +491,21 @@ public class ClientController {
 
     private boolean deleteEmailFromServer(Email email) {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            // Send delete request to server
+            socket.setSoTimeout(30000); // 30 seconds timeout
+
             NetworkUtils.sendObject(socket, "DELETE_EMAIL");
             NetworkUtils.sendObject(socket, email.getId());
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
-            // Wait for server response
-            Boolean serverDeleteSuccess = (Boolean) NetworkUtils.receiveObject(socket);
-
-            return serverDeleteSuccess;
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
+            Object response = NetworkUtils.receiveObject(socket);
+            if (response instanceof Boolean) {
+                return (Boolean) response;
+            } else {
+                System.err.println("Unexpected response type from server: " + response.getClass().getName());
+                return false;
+            }
+        } catch (Exception e) {
+            System.err.println("Error deleting email from server: " + e.getMessage());
             return false;
         }
     }
