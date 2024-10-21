@@ -34,6 +34,10 @@ public class MailServer {
         // Determine email type
         String emailType = determineEmailType(email);
 
+        // Assign a new ID to the email
+        int newId = EmailFileManager.getNextId();
+        email.setId(newId);
+
         // Save the email in recipients' inboxes and sender's sent folder
         boolean allSaved = true;
         for (String recipient : recipients) {
@@ -58,9 +62,9 @@ public class MailServer {
         // Log the email action
         String recipientsStr = recipients.stream().collect(Collectors.joining(", "));
         if (allSaved) {
-            serverController.logEvent(emailType + " sent by " + sender + " to " + recipientsStr);
+            serverController.logEvent(emailType + " (ID: " + newId + ") sent by " + sender + " to " + recipientsStr);
         } else {
-            serverController.logEvent(emailType + " partially sent by " + sender + " to " + recipientsStr + " (some errors occurred)");
+            serverController.logEvent(emailType + " (ID: " + newId + ") partially sent by " + sender + " to " + recipientsStr + " (some errors occurred)");
         }
     }
 
@@ -79,24 +83,28 @@ public class MailServer {
         return new ArrayList<>(accounts.get(recipient).getInbox());
     }
 
-    public boolean deleteEmail(long emailId, String userEmail) {
+    public boolean deleteEmail(int emailId, String userEmail) {
         EmailAccount account = accounts.get(userEmail);
         if (account != null) {
-            boolean deleted = account.removeEmail(emailId);
-            if (deleted) {
-                try {
-                    EmailFileManager.deleteEmail(String.valueOf(emailId), userEmail);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    System.err.println("Failed to delete email file for ID: " + emailId + " in account: " + userEmail);
+            Email emailToDelete = account.getEmailById(emailId);
+            if (emailToDelete != null) {
+                boolean deleted = account.removeEmail(emailId);
+                if (deleted) {
+                    try {
+                        EmailFileManager.deleteEmail(emailId, userEmail);
+                        serverController.logEvent("Email (ID: " + emailId + ") deleted for user: " + userEmail);
+                    } catch (IOException e) {
+                        serverController.logEvent("Failed to delete email file for ID: " + emailId + " in account: " + userEmail);
+                        e.printStackTrace();
+                    }
                 }
+                return deleted;
             }
-            return deleted;
         }
         return false;
     }
 
-public Map<String, EmailAccount> getAccounts() {
+    public Map<String, EmailAccount> getAccounts() {
         return accounts;
     }
 }

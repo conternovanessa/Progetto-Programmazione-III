@@ -15,23 +15,16 @@ import javafx.scene.text.TextFlow;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+
+import java.io.*;
 import java.net.Socket;
 import java.net.ConnectException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
-
-import static com.emailapp.EmailFileManager.markEmailAsRead;
 
 public class ClientController {
     private static final String SERVER_ADDRESS = "localhost";
@@ -129,26 +122,6 @@ public class ClientController {
         };
     }
 
-    private TableCell<Email, String> createBoldCell() {
-        return new TableCell<Email, String>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    setText(item);
-                    Email email = getTableView().getItems().get(getIndex());
-                    if (!email.isRead()) {
-                        setStyle("-fx-font-weight: bold;");
-                    } else {
-                        setStyle("");
-                    }
-                }
-            }
-        };
-    }
 
     private void refreshEmailTable() {
         emailTableView.setItems(mailbox.getAllEmails());
@@ -211,7 +184,6 @@ public class ClientController {
     private void handleEmailSelection() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            selectedEmail.printDebugInfo(); // Add this line for debugging
             displayEmailDetails(selectedEmail);
             if (!selectedEmail.isRead()) {
                 markEmailAsRead(selectedEmail);
@@ -224,7 +196,7 @@ public class ClientController {
         emailTableView.refresh();
         executorService.submit(() -> {
             try {
-                EmailFileManager.markEmailAsRead(String.valueOf(email.getId()), mailbox.getEmailAddress());
+                EmailFileManager.markEmailAsRead(email.getId(), mailbox.getEmailAddress());
             } catch (IOException e) {
                 e.printStackTrace();
                 Platform.runLater(() -> showErrorAlert("Error", "Failed to mark email as read"));
@@ -466,47 +438,83 @@ public class ClientController {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
             Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
-            confirmAlert.setTitle("Conferma eliminazione");
-            confirmAlert.setHeaderText("Sei sicuro di voler eliminare questa email?");
-            confirmAlert.setContentText("Questa azione non può essere annullata.");
+            confirmAlert.setTitle("Conferma Eliminazione");
+            confirmAlert.setHeaderText("Elimina Email");
+            confirmAlert.setContentText("Sei sicuro di voler eliminare questa email?");
 
             Optional<ButtonType> result = confirmAlert.showAndWait();
             if (result.isPresent() && result.get() == ButtonType.OK) {
                 deleteEmail(selectedEmail);
             }
-        } else {
-            showErrorAlert("Nessuna email selezionata", "Seleziona un'email da eliminare.");
         }
     }
 
-    private void deleteEmail(Email email) {
-        if (!isConnected()) {
-            showServerClosedAlert();
-            return;
-        }
 
+    private void deleteEmail(Email email) {
         executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-                NetworkUtils.sendObject(socket, email.getId());
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress()); // Invia anche l'indirizzo email dell'utente
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if ("SUCCESS".equals(response)) {
+            try {
+                // First, attempt to delete the email file locally
+                boolean locallyDeleted = EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
+
+                if (locallyDeleted) {
+                    // If local deletion was successful, attempt to delete from the server
+                    boolean deletedFromServer = deleteEmailFromServer(email);
+
                     Platform.runLater(() -> {
+                        // Remove the email from the mailbox and update the UI
                         mailbox.removeEmail(email);
                         refreshEmailTable();
-                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
                         returnToEmailListView();
+
+                        // Show a single success alert
+                        showInfoAlert("Email Eliminata", "L'email è stata eliminata con successo.");
                     });
                 } else {
-                    Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email dal server."));
+                    Platform.runLater(() -> {
+                        showErrorAlert("Errore di Eliminazione", "Impossibile eliminare l'email. Riprova più tardi.");
+                    });
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                Platform.runLater(() -> showErrorAlert("Errore di eliminazione", "Impossibile eliminare l'email: " + e.getMessage()));
+                Platform.runLater(() -> {
+                    showErrorAlert("Errore di Eliminazione", "Si è verificato un errore durante l'eliminazione dell'email: " + e.getMessage());
+                });
             }
         });
     }
+
+    private boolean deleteEmailFromServer(Email email) {
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            // Send delete request to server
+            NetworkUtils.sendObject(socket, "DELETE_EMAIL");
+            NetworkUtils.sendObject(socket, email.getId());
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+
+            // Wait for server response
+            Boolean serverDeleteSuccess = (Boolean) NetworkUtils.receiveObject(socket);
+
+            return serverDeleteSuccess;
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private boolean deleteLocalEmailFile(int emailId) {
+        String userDirectory = System.getProperty("user.home") + File.separator + "EmailApp" + File.separator + mailbox.getEmailAddress();
+        File emailFile = new File(userDirectory, "email_" + emailId + ".txt");
+
+        if (emailFile.exists()) {
+            return emailFile.delete();
+        } else {
+            System.out.println("File non trovato: " + emailFile.getAbsolutePath());
+            return false;
+        }
+    }
+
+    private void showWarningAlert(String title, String content) {
+        showAlert(Alert.AlertType.WARNING, title, content);
+    }
+
 
 
     private void openComposeWindow(Email selectedEmail, String mode) {

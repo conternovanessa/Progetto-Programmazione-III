@@ -68,32 +68,6 @@ public class Mailbox {
         this.emailLoadedCallback = callback;
     }
 
-
-    public synchronized void sendEmail(Email email) {
-        if (email.isEmpty()) {
-            return;
-        }
-
-        executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                EmailFileManager.saveEmail(email, emailAddress);
-                NetworkUtils.sendObject(socket, "SEND_EMAIL");
-                NetworkUtils.sendObject(socket, email);
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> {
-                        synchronized (lock) {
-                            addSentEmail(email);
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
-
     public String getEmailAddress() {
         return emailAddress;
     }
@@ -107,7 +81,7 @@ public class Mailbox {
     }
 
     public synchronized void addReceivedEmail(Email email) {
-        if (!hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
+        if (!receivedEmails.contains(email)) {
             receivedEmails.add(email);
         }
     }

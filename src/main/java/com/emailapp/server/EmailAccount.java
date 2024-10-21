@@ -39,4 +39,18 @@ public class EmailAccount {
         return inbox.removeIf(email -> email.getId() == emailId) ||
                 sent.removeIf(email -> email.getId() == emailId);
     }
+
+    public Email getEmailById(long id) {
+        for (Email email : inbox) {
+            if (email.getId() == id) {
+                return email;
+            }
+        }
+        for (Email email : sent) {
+            if (email.getId() == id) {
+                return email;
+            }
+        }
+        return null;
+    }
 }

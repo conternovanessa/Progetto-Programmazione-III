@@ -3,11 +3,12 @@ package com.emailapp.client;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 public class Email implements Serializable {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L; // Incrementato per la nuova versione della classe
 
-    private long id;
+    private int id; // Cambiato da long a int
     private String sender;
     private List<String> recipients;
     private String subject;
@@ -31,7 +32,7 @@ public class Email implements Serializable {
     }
 
     // Getters
-    public long getId() { return id; }
+    public int getId() { return id; } // Rimosso il cast a (int)
     public String getSender() { return sender; }
     public List<String> getRecipients() { return recipients; }
     public String getSubject() { return subject; }
@@ -41,7 +42,7 @@ public class Email implements Serializable {
     public boolean isRead() { return read; }
 
     // Setters
-    public void setId(long id) { this.id = id; }
+    public void setId(int id) { this.id = id; } // Cambiato da long a int
     public void setSender(String sender) { this.sender = sender; }
     public void setRecipients(List<String> recipients) { this.recipients = recipients; }
     public void setSubject(String subject) { this.subject = subject; }
@@ -62,7 +63,6 @@ public class Email implements Serializable {
                 ", recipients=" + recipients +
                 ", subject='" + subject + '\'' +
                 ", sentDate=" + sentDate +
-                ", deleted=" + deleted +
                 ", read=" + read +
                 '}';
     }
@@ -72,23 +72,15 @@ public class Email implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Email email = (Email) o;
-        return id == email.id;
+        return id == email.id &&
+                Objects.equals(sender, email.sender) &&
+                Objects.equals(recipients, email.recipients) &&
+                Objects.equals(subject, email.subject) &&
+                Objects.equals(sentDate, email.sentDate);
     }
 
     @Override
     public int hashCode() {
-        return Long.hashCode(id);
-    }
-
-    public void printDebugInfo() {
-        System.out.println("Email Debug Info:");
-        System.out.println("From: " + getSender());
-        System.out.println("To: " + String.join(", ", getRecipients()));
-        System.out.println("Subject: " + getSubject());
-        System.out.println("Date: " + getSentDate());
-        System.out.println("Body: " + getBody());
-        System.out.println("Is Read: " + isRead());
-        System.out.println("Is Deleted: " + isDeleted());
+        return Integer.hashCode(id); // Cambiato da Long.hashCode a Integer.hashCode
     }
 }
-

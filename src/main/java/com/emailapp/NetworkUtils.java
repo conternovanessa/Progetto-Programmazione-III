@@ -2,17 +2,43 @@ package com.emailapp;
 
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 
 public class NetworkUtils {
+    private static ObjectOutputStream getOutputStream(Socket socket) throws IOException {
+        OutputStream os = socket.getOutputStream();
+        if (os instanceof ObjectOutputStream) {
+            return (ObjectOutputStream) os;
+        } else {
+            return new ObjectOutputStream(os);
+        }
+    }
+
+    private static ObjectInputStream getInputStream(Socket socket) throws IOException {
+        InputStream is = socket.getInputStream();
+        if (is instanceof ObjectInputStream) {
+            return (ObjectInputStream) is;
+        } else {
+            return new ObjectInputStream(is);
+        }
+    }
+
     public static void sendObject(Socket socket, Object obj) throws IOException {
-        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+        if (socket.isClosed()) {
+            throw new SocketException("Socket is closed");
+        }
+        ObjectOutputStream out = getOutputStream(socket);
         out.writeObject(obj);
         out.flush();
+        // Non chiudere lo stream qui
     }
 
     public static Object receiveObject(Socket socket) throws IOException, ClassNotFoundException {
-        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+        if (socket.isClosed()) {
+            throw new SocketException("Socket is closed");
+        }
+        ObjectInputStream in = getInputStream(socket);
         return in.readObject();
+        // Non chiudere lo stream qui
     }
 }
-
