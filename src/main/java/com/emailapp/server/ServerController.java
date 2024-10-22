@@ -146,15 +146,15 @@ public class ServerController {
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        Long emailId = null;
+        Integer emailId = null;  // Cambiato da Long a Integer
         String userEmail = null;
         boolean success = false;
 
         try {
-            emailId = (Long) NetworkUtils.receiveObject(clientSocket);
+            emailId = (Integer) NetworkUtils.receiveObject(clientSocket);  // Cambiato da Long a Integer
             userEmail = (String) NetworkUtils.receiveObject(clientSocket);
 
-            success = mailServer.deleteEmail(Math.toIntExact(emailId), userEmail);
+            success = mailServer.deleteEmail(emailId, userEmail);  // Rimosso Math.toIntExact()
 
             NetworkUtils.sendObject(clientSocket, success);
 
@@ -169,6 +169,7 @@ public class ServerController {
             }
         }
     }
+
     public void stopServer() {
         if (!isRunning) {
             return;

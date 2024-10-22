@@ -465,20 +465,17 @@ public class ClientController {
                     boolean deletedFromServer = deleteEmailFromServer(email);
 
                     Platform.runLater(() -> {
-                        // Remove the email from the mailbox and update the UI regardless of server result
+                        // Remove the email from the mailbox and update the UI
                         mailbox.removeEmail(email);
                         refreshEmailTable();
                         returnToEmailListView();
 
-                        if (deletedFromServer) {
-                            showInfoAlert("Email Eliminata", "L'email è stata eliminata con successo.");
-                        } else {
-                            showWarningAlert("Eliminazione Parziale", "L'email è stata eliminata localmente ma potrebbe non essere stata eliminata dal server.");
-                        }
+                        // Show success message
+                        showInfoAlert("Email Eliminata", "L'email è stata eliminata con successo.");
                     });
                 } else {
                     Platform.runLater(() -> {
-                        showErrorAlert("Errore di Eliminazione", "Impossibile eliminare l'email localmente. Riprova più tardi.");
+                        showErrorAlert("Errore di Eliminazione", "Impossibile eliminare l'email. Riprova più tardi.");
                     });
                 }
             } catch (Exception e) {
