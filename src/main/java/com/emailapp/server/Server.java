@@ -1,5 +1,7 @@
 package com.emailapp.server;
 
+import com.emailapp.server.controller.ServerController;
+
 public class Server {
     private final ServerController serverController;
 

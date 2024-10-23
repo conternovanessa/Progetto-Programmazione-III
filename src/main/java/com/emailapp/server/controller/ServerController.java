@@ -1,15 +1,19 @@
-package com.emailapp.server;
+package com.emailapp.server.controller;
 
-import com.emailapp.NetworkUtils;
-import com.emailapp.client.Email;
+import com.emailapp.client.model.Email;
+import com.emailapp.server.model.MailServer;
+import com.emailapp.util.NetworkUtils;
 import javafx.application.Platform;
+import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.Button;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -23,14 +27,38 @@ public class ServerController {
     private ExecutorService executorService;
     private ServerSocket serverSocket;
     private boolean isRunning;
-    private final ServerViewController viewController;
     private static final int DEFAULT_PORT = 5000;
 
-    public ServerController(ServerViewController viewController) {
+    // FXML controls
+    @FXML private Label portLabel;
+    @FXML private Button startStopButton;
+    @FXML private TextArea logTextArea;
+
+    public ServerController() {
         this.mailServer = new MailServer(this);
-        this.viewController = viewController;
         this.executorService = Executors.newCachedThreadPool();
+    }
+
+    @FXML
+    private void initialize() {
+        portLabel.setText(String.valueOf(DEFAULT_PORT));
         startServer(DEFAULT_PORT); // Start the server automatically
+        updateButtonState();
+    }
+
+    @FXML
+    private void handleStartStop() {
+        if (isRunning) {
+            handleStopServer();
+        } else {
+            int port = Integer.parseInt(portLabel.getText());
+            startServer(port);
+        }
+        updateButtonState();
+    }
+
+    private void updateButtonState() {
+        startStopButton.setText(isRunning ? "Stop Server" : "Start Server");
     }
 
     public void startServer(int port) {
@@ -59,7 +87,6 @@ public class ServerController {
             }
         }
     }
-
 
     private void handleClient(Socket clientSocket) {
         ObjectInputStream inputStream = null;
@@ -94,20 +121,17 @@ public class ServerController {
                             break;
                     }
                 } catch (SocketException se) {
-                    // Normal disconnection scenarios - don't log these
                     if (se.getMessage().contains("Connection reset") ||
                             se.getMessage().contains("Socket closed") ||
                             se.getMessage().contains("Read timed out")) {
                         break;
                     }
-                    // Unexpected socket errors should be logged
                     isAbnormalDisconnection = true;
                     logEvent("Unexpected socket error: " + se.getMessage());
                     break;
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
-            // Only log abnormal disconnections or unexpected errors
             if (isRunning && !(e instanceof EOFException)) {
                 isAbnormalDisconnection = true;
                 logEvent("Error in client connection: " + e.getMessage());
@@ -119,7 +143,6 @@ public class ServerController {
                 }
                 if (!clientSocket.isClosed()) {
                     clientSocket.close();
-                    // Log only abnormal disconnections
                     if (isAbnormalDisconnection) {
                         logEvent("Client connection closed after error");
                     }
@@ -136,7 +159,6 @@ public class ServerController {
         Email email = (Email) NetworkUtils.receiveObject(clientSocket);
         mailServer.sendEmail(email);
         NetworkUtils.sendObject(clientSocket, "SUCCESS");
-        //logEvent("Email sent from " + email.getSender() + " to " + email.getRecipients());
     }
 
     private void handleFetchNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
@@ -146,15 +168,15 @@ public class ServerController {
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        Integer emailId = null;  // Cambiato da Long a Integer
+        Integer emailId = null;
         String userEmail = null;
         boolean success = false;
 
         try {
-            emailId = (Integer) NetworkUtils.receiveObject(clientSocket);  // Cambiato da Long a Integer
+            emailId = (Integer) NetworkUtils.receiveObject(clientSocket);
             userEmail = (String) NetworkUtils.receiveObject(clientSocket);
 
-            success = mailServer.deleteEmail(emailId, userEmail);  // Rimosso Math.toIntExact()
+            success = mailServer.deleteEmail(emailId, userEmail);
 
             NetworkUtils.sendObject(clientSocket, success);
 
@@ -163,45 +185,13 @@ public class ServerController {
             logEvent("Error during email deletion: " + e.getMessage());
             NetworkUtils.sendObject(clientSocket, false);
         } finally {
-            // Ensure we always send a response, even if an exception occurred
             if (emailId == null || userEmail == null) {
                 NetworkUtils.sendObject(clientSocket, false);
             }
         }
     }
 
-    public void stopServer() {
-        if (!isRunning) {
-            return;
-        }
-        isRunning = false;
-        try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
-                serverSocket.close();
-            }
-        } catch (IOException e) {
-            logEvent("Error closing server socket: " + e.getMessage());
-        }
-        executorService.shutdownNow();
-        executorService = Executors.newCachedThreadPool(); // Create a new ExecutorService for future use
-        logEvent("Server stopped");
-
-        // Notify the view controller that the server has stopped
-        Platform.runLater(() -> viewController.onServerStopped());
-    }
-
-    public void logEvent(String message) {
-        Platform.runLater(() -> viewController.logEvent(message));
-    }
-
-    public MailServer getMailServer() {
-        return mailServer;
-    }
-
-    public boolean isRunning() {
-        return isRunning;
-    }
-
+    @FXML
     public void handleStopServer() {
         if (!isRunning) {
             return;
@@ -224,5 +214,33 @@ public class ServerController {
         }
     }
 
+    public void stopServer() {
+        if (!isRunning) {
+            return;
+        }
+        isRunning = false;
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            logEvent("Error closing server socket: " + e.getMessage());
+        }
+        executorService.shutdownNow();
+        executorService = Executors.newCachedThreadPool();
+        logEvent("Server stopped");
+        Platform.runLater(() -> startStopButton.setText("Start Server"));
+    }
 
+    public void logEvent(String message) {
+        Platform.runLater(() -> logTextArea.appendText(message + "\n"));
+    }
+
+    public MailServer getMailServer() {
+        return mailServer;
+    }
+
+    public boolean isRunning() {
+        return isRunning;
+    }
 }

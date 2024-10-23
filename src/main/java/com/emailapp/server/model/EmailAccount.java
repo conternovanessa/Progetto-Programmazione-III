@@ -1,6 +1,6 @@
-package com.emailapp.server;
+package com.emailapp.server.model;
 
-import com.emailapp.client.Email;
+import com.emailapp.client.model.Email;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 

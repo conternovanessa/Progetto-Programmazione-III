@@ -6,10 +6,8 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import com.emailapp.server.Server;
 import com.emailapp.client.Client;
-import com.emailapp.server.ServerController;
-import com.emailapp.server.ServerViewController;
+import com.emailapp.server.controller.ServerController;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,9 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class StartApp extends Application {
-
     private ServerController serverController;
-    private Server server;
 
     @Override
     public void start(Stage primaryStage) {
@@ -30,21 +26,14 @@ public class StartApp extends Application {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/server/ServerView.fxml"));
             Parent root = loader.load();
 
-            // Ottiene il controller della vista
-            ServerViewController viewController = loader.getController();
-
-            // Inizializza il controller del server
-            serverController = new ServerController(viewController);
-            viewController.setServerController(serverController);
+            // Ottiene il controller
+            serverController = loader.getController();
 
             // Crea la scena per la vista del server
             Scene scene = new Scene(root, 600, 400);
             primaryStage.setScene(scene);
             primaryStage.setTitle("Email Server");
             primaryStage.show();
-
-            // Avvia il server
-            startServer();
 
             // Leggi gli indirizzi email e avvia i client
             List<String> emailAddresses = readEmailAddresses();
@@ -56,20 +45,6 @@ public class StartApp extends Application {
             System.err.println("Errore durante l'avvio dell'applicazione: " + e.getMessage());
             Platform.exit();
         }
-    }
-
-    private void startServer() {
-        // Avvio del server in un thread separato per evitare blocchi dell'interfaccia
-        new Thread(() -> {
-            try {
-                server = new Server(serverController);
-                server.start();
-                Platform.runLater(() -> serverController.logEvent("Server started successfully."));
-            } catch (Exception e) {
-                e.printStackTrace();
-                Platform.runLater(() -> serverController.logEvent("Failed to start the server: " + e.getMessage()));
-            }
-        }).start();
     }
 
     private void startClient(String email) {
@@ -89,12 +64,10 @@ public class StartApp extends Application {
         List<String> emails = new ArrayList<>();
         try (InputStream is = getClass().getResourceAsStream("/emails.txt");
              BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-
             if (is == null) {
                 System.err.println("Il file emails.txt non è stato trovato.");
                 return emails;
             }
-
             String line;
             while ((line = reader.readLine()) != null) {
                 emails.add(line.trim());
@@ -107,8 +80,8 @@ public class StartApp extends Application {
 
     @Override
     public void stop() {
-        if (server != null) {
-            server.stop();
+        if (serverController != null && serverController.isRunning()) {
+            serverController.handleStopServer();
         }
         Platform.exit();
     }

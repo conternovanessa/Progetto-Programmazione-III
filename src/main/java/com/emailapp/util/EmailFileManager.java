@@ -1,6 +1,6 @@
-package com.emailapp;
+package com.emailapp.util;
 
-import com.emailapp.client.Email;
+import com.emailapp.client.model.Email;
 
 import java.io.*;
 import java.nio.file.*;
@@ -19,28 +19,31 @@ public class EmailFileManager {
 
     private static void initializeIdCounter() {
         Path idFilePath = Paths.get(BASE_DIR, ID_FILE);
-        if (Files.exists(idFilePath)) {
-            try {
+        try {
+            Files.createDirectories(Paths.get(BASE_DIR));
+            if (Files.exists(idFilePath)) {
                 String lastId = Files.readString(idFilePath).trim();
                 idCounter.set(Integer.parseInt(lastId));
-            } catch (IOException | NumberFormatException e) {
-                System.err.println("Errore nella lettura dell'ultimo ID: " + e.getMessage());
             }
+        } catch (IOException | NumberFormatException e) {
+            System.err.println("Errore nella lettura dell'ultimo ID: " + e.getMessage());
         }
     }
 
-    private static void updateIdFile() {
+    private static void updateIdFile(int currentId) {
         Path idFilePath = Paths.get(BASE_DIR, ID_FILE);
         try {
-            Files.writeString(idFilePath, String.valueOf(idCounter.get()));
+            Files.writeString(idFilePath, String.valueOf(currentId));
         } catch (IOException e) {
             System.err.println("Errore nell'aggiornamento del file ID: " + e.getMessage());
         }
     }
 
     public static synchronized int getNextId() {
-        int nextId = idCounter.incrementAndGet();
-        updateIdFile();
+        int currentId = idCounter.get();
+        int nextId = currentId + 1;
+        idCounter.set(nextId);
+        updateIdFile(nextId);
         return nextId;
     }
 

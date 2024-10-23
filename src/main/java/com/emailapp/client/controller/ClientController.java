@@ -1,7 +1,9 @@
-package com.emailapp.client;
+package com.emailapp.client.controller;
 
-import com.emailapp.NetworkUtils;
-import com.emailapp.EmailFileManager;
+import com.emailapp.util.NetworkUtils;
+import com.emailapp.util.EmailFileManager;
+import com.emailapp.client.model.Email;
+import com.emailapp.client.model.Mailbox;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -19,7 +21,6 @@ import javafx.util.Duration;
 import java.io.*;
 import java.net.Socket;
 import java.net.ConnectException;
-import java.net.SocketException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -231,8 +232,6 @@ public class ClientController {
         emailDetailFlow.setVisible(true);
         actionButtons.setVisible(true);
 
-        // For debugging
-        System.out.println("Email body: " + email.getBody());
     }
 
     @FXML
@@ -514,7 +513,6 @@ public class ClientController {
         if (emailFile.exists()) {
             return emailFile.delete();
         } else {
-            System.out.println("File non trovato: " + emailFile.getAbsolutePath());
             return false;
         }
     }

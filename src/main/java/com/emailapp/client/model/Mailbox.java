@@ -1,13 +1,11 @@
-package com.emailapp.client;
+package com.emailapp.client.model;
 
-import com.emailapp.EmailFileManager;
-import com.emailapp.NetworkUtils;
+import com.emailapp.util.EmailFileManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

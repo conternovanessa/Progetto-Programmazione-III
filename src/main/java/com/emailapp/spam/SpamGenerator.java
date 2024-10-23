@@ -1,6 +1,8 @@
-package com.emailapp.client;
+package com.emailapp.spam;
 
-import com.emailapp.NetworkUtils;
+import com.emailapp.client.model.Email;
+import com.emailapp.util.NetworkUtils;
+
 import javax.swing.*;
 import java.awt.*;
 import java.io.BufferedReader;
@@ -102,11 +104,6 @@ public class SpamGenerator extends JFrame {
             NetworkUtils.sendObject(socket, "SEND_EMAIL");
             NetworkUtils.sendObject(socket, spamEmail);
             String response = (String) NetworkUtils.receiveObject(socket);
-            if ("SUCCESS".equals(response)) {
-                System.out.println("Spam email sent to " + recipient);
-            } else {
-                System.out.println("Failed to send spam email to " + recipient);
-            }
         } catch (Exception e) {
             System.err.println("Error sending spam email to " + recipient + ": " + e.getMessage());
         }
