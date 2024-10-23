@@ -49,18 +49,14 @@ public class EmailFileManager {
 
     public static void saveEmail(Email email, String userEmail) throws IOException {
         if (!email.getRecipients().contains(userEmail)) {
-            return; // Non salvare l'email se l'utente corrente non è tra i destinatari
+            return;
         }
 
         Path userDir = Paths.get(BASE_DIR, userEmail);
         Files.createDirectories(userDir);
 
-        // Genera un nuovo ID univoco e sequenziale per l'email
-        int newId = getNextId();
-        email.setId(newId);
-
-        // Genera un nome file con il nuovo formato ID
-        String fileName = "Email_" + newId + ".txt";
+        // Usa l'ID esistente dell'email invece di generarne uno nuovo
+        String fileName = "Email_" + email.getId() + ".txt";
         Path filePath = userDir.resolve(fileName);
 
         try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {

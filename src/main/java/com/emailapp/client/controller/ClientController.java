@@ -211,9 +211,28 @@ public class ClientController {
 
     @FXML
     private void handleComposeEmail() {
-        emailDetailFlow.setVisible(false); // Hide email details
-        composeView.setVisible(true); // Show the compose view
-        detailOrComposeStack.getChildren().setAll(composeView); // Ensure only compose view is in the StackPane
+        // Reset dei campi
+        toField.clear();
+        subjectField.clear();
+        bodyArea.clear();
+
+        // Rendi il campo destinatario modificabile
+        toField.setEditable(true);
+
+        // Mostra la vista di composizione
+        emailDetailFlow.setVisible(false);
+        composeView.setVisible(true);
+        detailOrComposeStack.getChildren().setAll(composeView);
+
+        // Binding delle dimensioni
+        composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
+        composeView.prefHeightProperty().bind(detailOrComposeStack.heightProperty());
+
+        // Reimposta l'handler per il pulsante di invio
+        sendButton.setOnAction(event -> {
+            handleSendEmail();
+            returnToEmailListView();
+        });
     }
 
     private void displayEmailDetails(Email email) {
