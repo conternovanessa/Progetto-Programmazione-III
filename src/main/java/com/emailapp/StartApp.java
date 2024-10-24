@@ -6,7 +6,12 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.scene.control.Button;
+import javafx.scene.layout.VBox;
+import javafx.geometry.Insets;
+import javafx.stage.Modality;
 import com.emailapp.client.Client;
+import com.emailapp.client.ClientManager;
 import com.emailapp.server.controller.ServerController;
 
 import java.io.BufferedReader;
@@ -18,10 +23,14 @@ import java.util.List;
 
 public class StartApp extends Application {
     private ServerController serverController;
+    private ClientManager clientManager;
 
     @Override
     public void start(Stage primaryStage) {
         try {
+            // Inizializza il ClientManager
+            clientManager = ClientManager.getInstance();
+
             // Carica il file FXML per la vista del server
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/server/ServerView.fxml"));
             Parent root = loader.load();
@@ -40,11 +49,35 @@ public class StartApp extends Application {
             for (String email : emailAddresses) {
                 startClient(email);
             }
+
+            // Crea il pulsante per i client recenti
+            createRecentClientsButton();
+
         } catch (IOException e) {
             e.printStackTrace();
             System.err.println("Errore durante l'avvio dell'applicazione: " + e.getMessage());
             Platform.exit();
         }
+    }
+
+    private void createRecentClientsButton() {
+        Button recentButton = new Button("Recent Clients");
+        recentButton.setStyle("-fx-font-size: 14px; -fx-min-width: 120px;");
+        recentButton.setOnAction(e -> clientManager.showRecentClientsWindow());
+
+        // Crea una piccola finestra sempre in primo piano per il pulsante
+        Stage buttonStage = new Stage();
+        buttonStage.initModality(Modality.NONE);
+        buttonStage.setAlwaysOnTop(true);
+        buttonStage.setX(10);
+        buttonStage.setY(10);
+        buttonStage.setTitle("Recent Clients");
+
+        VBox buttonBox = new VBox(recentButton);
+        buttonBox.setPadding(new Insets(5));
+        Scene buttonScene = new Scene(buttonBox);
+        buttonStage.setScene(buttonScene);
+        buttonStage.show();
     }
 
     private void startClient(String email) {
