@@ -40,8 +40,7 @@ public class EmailFileManager {
     }
 
     public static synchronized int getNextId() {
-        int currentId = idCounter.get();
-        int nextId = currentId + 1;
+        int nextId = idCounter.get() + 1;
         idCounter.set(nextId);
         updateIdFile(nextId);
         return nextId;
@@ -55,12 +54,15 @@ public class EmailFileManager {
         Path userDir = Paths.get(BASE_DIR, userEmail);
         Files.createDirectories(userDir);
 
-        // Usa l'ID esistente dell'email invece di generarne uno nuovo
-        String fileName = "Email_" + email.getId() + ".txt";
+        // Genera un nuovo ID univoco per ogni copia dell'email
+        int newId = getNextId();
+        email.setId(newId);
+
+        String fileName = "Email_" + newId + ".txt";
         Path filePath = userDir.resolve(fileName);
 
         try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
-            writer.write("Id: " + email.getId());
+            writer.write("Id: " + newId);
             writer.newLine();
             writer.write("From: " + email.getSender());
             writer.newLine();
@@ -75,7 +77,6 @@ public class EmailFileManager {
             writer.write("Body: " + email.getBody());
         }
     }
-
     public static List<Email> loadEmails(String userEmail) throws IOException {
         List<Email> emails = new ArrayList<>();
         Path userDir = Paths.get(BASE_DIR, userEmail);
@@ -115,7 +116,7 @@ public class EmailFileManager {
     public static boolean deleteEmail(int emailId, String userEmail) throws IOException {
         Path userDir = Paths.get(BASE_DIR, userEmail);
         if (!Files.exists(userDir)) {
-            return false; // The user directory doesn't exist, so there's nothing to delete
+            return false;
         }
 
         String fileName = "Email_" + emailId + ".txt";
@@ -124,14 +125,14 @@ public class EmailFileManager {
         if (Files.exists(filePath)) {
             try {
                 Files.delete(filePath);
-                return true; // File successfully deleted
+                return true;
             } catch (IOException e) {
                 System.err.println("Failed to delete file: " + filePath);
                 e.printStackTrace();
-                return false; // File deletion failed
+                return false;
             }
         } else {
-            return false; // File doesn't exist
+            return false;
         }
     }
 
