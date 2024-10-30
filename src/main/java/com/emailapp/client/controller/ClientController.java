@@ -161,21 +161,30 @@ public class ClientController {
     }
 
     public void checkConnection() {
-        executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "PING");
-                String response = (String) NetworkUtils.receiveObject(socket);
-                boolean isConnected = "PONG".equals(response);
-                Platform.runLater(() -> {
-                    connectedProperty.set(isConnected);
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    connectedProperty.set(false);
-                });
+        Socket socket = null;
+        try {
+            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            NetworkUtils.sendObject(socket, "PING");
+            String response = (String) NetworkUtils.receiveObject(socket);
+            boolean isConnected = "PONG".equals(response);
+            Platform.runLater(() -> {
+                connectedProperty.set(isConnected);
+            });
+        } catch (Exception e) {
+            Platform.runLater(() -> {
+                connectedProperty.set(false);
+            });
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    System.err.println("Errore chiusura socket: " + e.getMessage());
+                }
             }
-        });
+        }
     }
+
 
 
 
@@ -359,75 +368,73 @@ public class ClientController {
     }
 
     private synchronized void sendEmail(Email email) {
-        if (!isConnected()) {
-            showServerClosedAlert();
-            return;
-        }
+        Socket socket = null;
+        try {
+            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            NetworkUtils.sendObject(socket, "SEND_EMAIL");
+            NetworkUtils.sendObject(socket, email);
+            String response = (String) NetworkUtils.receiveObject(socket);
 
-        if (email.isEmpty()) {
-            showErrorAlert("Send Error", "Cannot send an empty email");
-            return;
-        }
-
-        executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "SEND_EMAIL");
-                NetworkUtils.sendObject(socket, email);
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if ("SUCCESS".equals(response)) {
-                    Platform.runLater(() -> {
-                        composeView.setVisible(false);
-                        clearComposeFields();
-                        //showInfoAlert("Email Sent", "Your email has been sent successfully.");
-                    });
+            Platform.runLater(() -> {
+                if ("OK".equals(response)) {
+                    mailbox.addSentEmail(email);
+                    refreshEmailTable();
+                    showInfoAlert("Email Sent", "Email successfully sent to " + email.getRecipients());
                 } else {
-                    Platform.runLater(() -> showErrorAlert("Send Error", "Failed to send email: " + response));
+                    showErrorAlert("Error", "Failed to send email: " + response);
                 }
-            } catch (ConnectException e) {
-                Platform.runLater(this::showServerClosedAlert);
-            } catch (Exception e) {
-                handleConnectionError(e);
-                e.printStackTrace();
-                Platform.runLater(() -> showErrorAlert("Send Error", "Failed to send email: " + e.getMessage()));
+            });
+        } catch (Exception e) {
+            handleConnectionError(e);
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    System.err.println("Errore chiusura socket: " + e.getMessage());
+                }
             }
-        });
+        }
     }
-
 
     private synchronized void fetchNewEmails() {
-        if (!isConnected()) {
-            return;  // Silently return if not connected
-        }
+        Socket socket = null;
+        try {
+            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+            @SuppressWarnings("unchecked")
+            List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
 
-        executorService.submit(() -> {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-                @SuppressWarnings("unchecked")
-                List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
-                Platform.runLater(() -> {
-                    synchronized (lock) {
-                        int newEmailCount = 0;
-                        for (Email email : newEmails) {
-                            if (!mailbox.hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
-                                mailbox.addReceivedEmail(email);
-                                newEmailCount++;
-                            }
-                        }
-                        if (newEmailCount > 0) {
-                            refreshEmailTable();
-                            showInfoAlert("New Emails for: " + mailbox.getEmailAddress(),
-                                    "Received " + newEmailCount + " new email(s)");
+            Platform.runLater(() -> {
+                synchronized (lock) {
+                    int newEmailCount = 0;
+                    for (Email email : newEmails) {
+                        if (!mailbox.hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
+                            mailbox.addReceivedEmail(email);
+                            newEmailCount++;
                         }
                     }
-                });
-            } catch (ConnectException e) {
-                // Silently handle disconnection
-            } catch (Exception e) {
-                handleConnectionError(e);
+                    if (newEmailCount > 0) {
+                        refreshEmailTable();
+                        showInfoAlert("New Emails for: " + mailbox.getEmailAddress(),
+                                "Received " + newEmailCount + " new email(s)");
+                    }
+                }
+            });
+        } catch (Exception e) {
+            handleConnectionError(e);
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    System.err.println("Errore chiusura socket: " + e.getMessage());
+                }
             }
-        });
+        }
     }
+
     @FXML
     private void handleReplyEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();

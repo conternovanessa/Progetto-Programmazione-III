@@ -156,15 +156,35 @@ public class ServerController {
     }
 
     private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        Email email = (Email) NetworkUtils.receiveObject(clientSocket);
-        mailServer.sendEmail(email);
-        NetworkUtils.sendObject(clientSocket, "SUCCESS");
+        try {
+            Email email = (Email) NetworkUtils.receiveObject(clientSocket);
+            mailServer.sendEmail(email);
+            NetworkUtils.sendObject(clientSocket, "SUCCESS");
+        } finally {
+            if (clientSocket != null && !clientSocket.isClosed()) {
+                try {
+                    clientSocket.close();
+                } catch (IOException e) {
+                    logEvent("Error closing socket in handleSendEmail: " + e.getMessage());
+                }
+            }
+        }
     }
 
     private void handleFetchNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
-        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
-        List<Email> newEmails = mailServer.getNewEmails(recipient);
-        NetworkUtils.sendObject(clientSocket, newEmails);
+        try {
+            String recipient = (String) NetworkUtils.receiveObject(clientSocket);
+            List<Email> newEmails = mailServer.getNewEmails(recipient);
+            NetworkUtils.sendObject(clientSocket, newEmails);
+        } finally {
+            if (clientSocket != null && !clientSocket.isClosed()) {
+                try {
+                    clientSocket.close();
+                } catch (IOException e) {
+                    logEvent("Error closing socket in handleFetchNewEmails: " + e.getMessage());
+                }
+            }
+        }
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
@@ -175,11 +195,8 @@ public class ServerController {
         try {
             emailId = (Integer) NetworkUtils.receiveObject(clientSocket);
             userEmail = (String) NetworkUtils.receiveObject(clientSocket);
-
             success = mailServer.deleteEmail(emailId, userEmail);
-
             NetworkUtils.sendObject(clientSocket, success);
-
             logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId + " and user: " + userEmail);
         } catch (Exception e) {
             logEvent("Error during email deletion: " + e.getMessage());
@@ -187,6 +204,13 @@ public class ServerController {
         } finally {
             if (emailId == null || userEmail == null) {
                 NetworkUtils.sendObject(clientSocket, false);
+            }
+            if (clientSocket != null && !clientSocket.isClosed()) {
+                try {
+                    clientSocket.close();
+                } catch (IOException e) {
+                    logEvent("Error closing socket in handleDeleteEmail: " + e.getMessage());
+                }
             }
         }
     }
@@ -219,18 +243,19 @@ public class ServerController {
             return;
         }
         isRunning = false;
-        try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
                 serverSocket.close();
+            } catch (IOException e) {
+                logEvent("Error closing server socket: " + e.getMessage());
             }
-        } catch (IOException e) {
-            logEvent("Error closing server socket: " + e.getMessage());
         }
         executorService.shutdownNow();
         executorService = Executors.newCachedThreadPool();
         logEvent("Server stopped");
         Platform.runLater(() -> startStopButton.setText("Start Server"));
     }
+
 
     public void logEvent(String message) {
         Platform.runLater(() -> logTextArea.appendText(message + "\n"));
