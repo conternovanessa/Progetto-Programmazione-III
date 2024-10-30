@@ -58,6 +58,7 @@ public class ClientController {
     private Instant lastAlertTime = Instant.MIN;
     private Set<String> validEmails;
     private final Object lock = new Object();
+    private boolean isComposeViewVisible = false;
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -220,27 +221,22 @@ public class ClientController {
 
     @FXML
     private void handleComposeEmail() {
-        // Reset dei campi
-        toField.clear();
-        subjectField.clear();
-        bodyArea.clear();
+        // Impostare la variabile di stato
+        isComposeViewVisible = true;
 
-        // Rendi il campo destinatario modificabile
-        toField.setEditable(true);
-
-        // Mostra la vista di composizione
-        emailDetailFlow.setVisible(false);
+        // Mostrare la sezione di composizione
         composeView.setVisible(true);
-        detailOrComposeStack.getChildren().setAll(composeView);
+        emailDetailFlow.setVisible(false);
+        emailTableView.setVisible(false);
+        actionButtons.setVisible(false);
 
-        // Binding delle dimensioni
+        // Impostare le dimensioni della sezione di composizione
         composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
         composeView.prefHeightProperty().bind(detailOrComposeStack.heightProperty());
 
-        // Reimposta l'handler per il pulsante di invio
+        // Definire l'azione del pulsante di invio
         sendButton.setOnAction(event -> {
             handleSendEmail();
-            returnToEmailListView();
         });
     }
 
@@ -262,29 +258,31 @@ public class ClientController {
 
     }
 
-    @FXML
-    private void handleCancelEmail() {
-        composeView.setVisible(false);
-        clearComposeFields();
-        actionButtons.setVisible(false); // Hide action buttons when cancelling compose
-    }
 
     @FXML
     private void handleBackButton() {
-        // Hide email details and compose view
-        emailDetailFlow.setVisible(false);
-        composeView.setVisible(false);
+        // Verificare la visibilità della sezione di composizione
+        if (isComposeViewVisible) {
+            // Nascondere la sezione di composizione
+            composeView.setVisible(false);
+            isComposeViewVisible = false;
+        }
 
-        // Hide action buttons
+        // Nascondere i dettagli dell'email
+        emailDetailFlow.setVisible(false);
+
+        // Mostrare la tabella delle email se era visibile in precedenza
+        if (!composeView.isVisible()) {
+            emailTableView.setVisible(true);
+        }
+
+        // Nascondere i pulsanti di azione
         actionButtons.setVisible(false);
 
-        // Ensure the email table view is visible
-        emailTableView.setVisible(true);
-
-        // Clear the right side of the interface
+        // Pulire il pannello a destra
         detailOrComposeStack.getChildren().clear();
 
-        // Refresh the email table
+        // Aggiornare la tabella delle email
         refreshEmailTable();
     }
 
@@ -314,14 +312,15 @@ public class ClientController {
         if (validateFields()) {
             String recipientsString = toField.getText().trim();
             List<String> recipients = Arrays.asList(recipientsString.split("\\s*,\\s*"));
-
             boolean allValid = recipients.stream().allMatch(this::isValidRecipient);
 
             if (!allValid) {
                 showErrorAlert("Indirizzo inesistente", "Uno o più indirizzi email forniti non sono presenti in emails.txt");
+                // Non facciamo nulla dopo l'alert, lasciando tutto com'è
                 return;
             }
 
+            // Solo se arriviamo qui (tutto è valido) procediamo con l'invio
             Email newEmail = new Email();
             newEmail.setSender(mailbox.getEmailAddress());
             newEmail.setRecipients(recipients);
@@ -332,9 +331,7 @@ public class ClientController {
                 sendEmail(newEmail);
             }
 
-            composeView.setVisible(false);
-            clearComposeFields();
-
+            // Solo dopo un invio riuscito facciamo il return alla lista
             returnToEmailListView();
         }
     }
@@ -367,7 +364,7 @@ public class ClientController {
         return true;
     }
 
-    private synchronized void sendEmail(Email email) {
+    private synchronized boolean sendEmail(Email email) {
         Socket socket = null;
         try {
             socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
@@ -375,23 +372,28 @@ public class ClientController {
             NetworkUtils.sendObject(socket, email);
             String response = (String) NetworkUtils.receiveObject(socket);
 
-            Platform.runLater(() -> {
-                if ("OK".equals(response)) {
+            if ("OK".equals(response)) {
+                Platform.runLater(() -> {
                     mailbox.addSentEmail(email);
                     refreshEmailTable();
-                    showInfoAlert("Email Sent", "Email successfully sent to " + email.getRecipients());
-                } else {
-                    showErrorAlert("Error", "Failed to send email: " + response);
-                }
-            });
+                    showInfoAlert("Email Inviata", "Email inviata correttamente a " + email.getRecipients());
+                });
+                return true;
+            } else {
+                Platform.runLater(() -> {
+                    showErrorAlert("Errore di Invio", "Impossibile inviare l'email: " + response);
+                });
+                return false;
+            }
         } catch (Exception e) {
             handleConnectionError(e);
+            return false;
         } finally {
             if (socket != null && !socket.isClosed()) {
                 try {
                     socket.close();
-                } catch (IOException e) {
-                    System.err.println("Errore chiusura socket: " + e.getMessage());
+                } catch (IOException ex) {
+                    System.err.println("Errore chiusura socket: " + ex.getMessage());
                 }
             }
         }
@@ -550,94 +552,72 @@ public class ClientController {
 
 
     private void openComposeWindow(Email selectedEmail, String mode) {
+        // Mostrar a tela de composição
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
         emailTableView.setVisible(false);
         actionButtons.setVisible(false);
 
-        if (selectedEmail != null) {
-            // Set the recipient(s)
-            if (mode.equals("Reply")) {
-                toField.setText(selectedEmail.getSender());
-            } else if (mode.equals("Reply All")) {
-                List<String> allRecipients = new ArrayList<>(selectedEmail.getRecipients());
-                allRecipients.add(selectedEmail.getSender());
-                allRecipients.remove(mailbox.getEmailAddress()); // Remove the current user's email
-                toField.setText(String.join(", ", allRecipients));
-            } else if (mode.equals("Forward")) {
-                toField.clear(); // Clear the recipient field for forward
-            }
-            toField.setEditable(mode.equals("Forward")); // Make the recipient field editable only for Forward
 
-            // Set the subject
-            String subjectPrefix = mode.equals("Forward") ? "Fwd: " : "Re: ";
-            subjectField.setText(subjectPrefix + selectedEmail.getSubject());
 
-            // Set the body
-            StringBuilder bodyBuilder = new StringBuilder();
-            if (mode.equals("Forward")) {
-                bodyBuilder.append("\n\n---------- Forwarded message ---------\n");
-                bodyBuilder.append("From: ").append(selectedEmail.getSender()).append("\n");
-                bodyBuilder.append("Date: ").append(selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))).append("\n");
-                bodyBuilder.append("Subject: ").append(selectedEmail.getSubject()).append("\n");
-                bodyBuilder.append("To: ").append(String.join(", ", selectedEmail.getRecipients())).append("\n\n");
-                bodyBuilder.append(selectedEmail.getBody());
-            } else {
-                String originalBody = selectedEmail.getBody();
-                String quotedBody = originalBody.lines()
-                        .map(line -> "> " + line)
-                        .collect(Collectors.joining("\n"));
-                String headerLine = String.format("On %s, %s wrote:",
-                        selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
-                        selectedEmail.getSender());
-                bodyBuilder.append("\n\n").append(headerLine).append("\n").append(quotedBody);
-            }
-            bodyArea.setText(bodyBuilder.toString());
+        // Definir a ação do botão de envio
+        sendButton.setOnAction(event -> {
+            handleSendEmail();
 
-            // Place the cursor at the beginning of the body
-            bodyArea.positionCaret(0);
-        }
+        });
 
-        emailTableView.setVisible(true); // Ensure table view remains visible
+
+        emailTableView.setVisible(true);
         detailOrComposeStack.getChildren().setAll(composeView);
         composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
         composeView.prefHeightProperty().bind(detailOrComposeStack.heightProperty());
-
-        sendButton.setOnAction(event -> {
-            handleSendEmail();
-            returnToEmailListView();
-        });
     }
 
     @FXML
     private void handleBackInCompose() {
-        returnToEmailListView();
+        // Verificare la visibilità della sezione di composizione
+        if (isComposeViewVisible) {
+            // Nascondere la sezione di composizione
+            composeView.setVisible(false);
+            isComposeViewVisible = false;
+        }
+
+        // Mostrare nuovamente la tabella delle email
+        emailTableView.setVisible(true);
+
+        // Pulire il pannello a destra
+        detailOrComposeStack.getChildren().clear();
+
+        // Aggiornare la tabella delle email
+        refreshEmailTable();
     }
 
+    @FXML
     private void returnToEmailListView() {
-        // Hide compose and detail views
-        composeView.setVisible(false);
+        // Verificare la visibilità della sezione di composizione
+        if (isComposeViewVisible) {
+            // Nascondere la sezione di composizione
+            composeView.setVisible(false);
+            isComposeViewVisible = false;
+        }
+
+        // Nascondere i dettagli dell'email
         emailDetailFlow.setVisible(false);
         actionButtons.setVisible(false);
 
-        // Show email table view (should already be visible, but ensure it is)
+        // Mostrare la tabella delle email
         emailTableView.setVisible(true);
 
-        // Clear the right side of the interface
+        // Pulire il pannello a destra
         detailOrComposeStack.getChildren().clear();
 
-        // Reset the layout
+        // Reimpostare il layout
         emailTableView.setManaged(true);
         emailTableView.setMaxWidth(Double.MAX_VALUE);
         emailTableView.setMaxHeight(Double.MAX_VALUE);
 
-        // Clear compose fields
-        clearComposeFields();
-
-        // Refresh the email table
+        // Aggiornare la tabella delle email
         refreshEmailTable();
-
-        // Request layout update
         emailTableView.requestLayout();
         detailOrComposeStack.requestLayout();
     }
