@@ -159,7 +159,6 @@ public class ServerController {
         try {
             Email email = (Email) NetworkUtils.receiveObject(clientSocket);
             mailServer.sendEmail(email);
-            NetworkUtils.sendObject(clientSocket, "SUCCESS");
         } finally {
             if (clientSocket != null && !clientSocket.isClosed()) {
                 try {
