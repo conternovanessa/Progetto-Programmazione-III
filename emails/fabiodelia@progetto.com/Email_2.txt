@@ -1,7 +1,0 @@
-Id: 2
-From: vanessaconterno@progetto.com
-To: fabiodelia@progetto.com
-Subject: sas
-Date: 2024-10-30T17:00:21.828451600
-Read: true
-Body: sis
