@@ -331,8 +331,6 @@ public class ClientController {
             synchronized (lock) {
                 sendEmail(newEmail);
             }
-
-            // Solo dopo un invio riuscito facciamo il return alla lista
             returnToEmailListView();
         }
     }

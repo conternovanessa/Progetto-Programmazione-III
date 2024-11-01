@@ -32,15 +32,15 @@ public class MailServer {
         createAccount(sender);
         recipients.forEach(this::createAccount);
 
-        // Generate a single ID for all copies of the email
-        int emailId = EmailFileManager.getNextId();
-        email.setId(emailId);
-
-        // Save copies for all recipients with the same ID
+        // Create independent copies only for recipients
         for (String recipient : recipients) {
+            int uniqueEmailId = EmailFileManager.getNextId();
+
             Email recipientCopy = createEmailCopy(email);
-            // Keep the same ID for all copies
-            recipientCopy.setId(emailId);
+            recipientCopy.setId(uniqueEmailId);
+            // Keep all recipients for Reply All functionality
+            recipientCopy.setRecipients(email.getRecipients());
+
             accounts.get(recipient).addToInbox(recipientCopy);
             try {
                 EmailFileManager.saveEmail(recipientCopy, recipient);
@@ -49,18 +49,8 @@ public class MailServer {
             }
         }
 
-        // Save sender's copy with the same ID
-        Email senderCopy = createEmailCopy(email);
-        senderCopy.setId(emailId);
-        accounts.get(sender).addToSent(senderCopy);
-        try {
-            EmailFileManager.saveEmail(senderCopy, sender);
-        } catch (IOException e) {
-            serverController.logEvent("Error saving sent email for " + sender + ": " + e.getMessage());
-        }
-
         String recipientsStr = String.join(", ", recipients);
-        serverController.logEvent("Email (ID: " + emailId + ") sent by " + sender + " to " + recipientsStr);
+        serverController.logEvent("Emails sent by " + sender + " to " + recipientsStr);
     }
 
     private Email createEmailCopy(Email original) {
