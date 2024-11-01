@@ -40,7 +40,8 @@ public class EmailFileManager {
     }
 
     public static synchronized int getNextId() {
-        int nextId = idCounter.get() + 1;
+        int currentId = idCounter.get();
+        int nextId = currentId + 1;
         idCounter.set(nextId);
         updateIdFile(nextId);
         return nextId;
@@ -54,15 +55,12 @@ public class EmailFileManager {
         Path userDir = Paths.get(BASE_DIR, userEmail);
         Files.createDirectories(userDir);
 
-        // Genera un nuovo ID univoco per ogni copia dell'email
-        int newId = getNextId();
-        email.setId(newId);
-
-        String fileName = "Email_" + newId + ".txt";
+        // Usa l'ID esistente dell'email invece di generarne uno nuovo
+        String fileName = "Email_" + email.getId() + ".txt";
         Path filePath = userDir.resolve(fileName);
 
         try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
-            writer.write("Id: " + newId);
+            writer.write("Id: " + email.getId());
             writer.newLine();
             writer.write("From: " + email.getSender());
             writer.newLine();
@@ -77,6 +75,7 @@ public class EmailFileManager {
             writer.write("Body: " + email.getBody());
         }
     }
+
     public static List<Email> loadEmails(String userEmail) throws IOException {
         List<Email> emails = new ArrayList<>();
         Path userDir = Paths.get(BASE_DIR, userEmail);
@@ -115,25 +114,13 @@ public class EmailFileManager {
 
     public static boolean deleteEmail(int emailId, String userEmail) throws IOException {
         Path userDir = Paths.get(BASE_DIR, userEmail);
-        if (!Files.exists(userDir)) {
-            return false;
-        }
+        Path emailFile = userDir.resolve("Email_" + emailId + ".txt");
 
-        String fileName = "Email_" + emailId + ".txt";
-        Path filePath = userDir.resolve(fileName);
-
-        if (Files.exists(filePath)) {
-            try {
-                Files.delete(filePath);
-                return true;
-            } catch (IOException e) {
-                System.err.println("Failed to delete file: " + filePath);
-                e.printStackTrace();
-                return false;
-            }
-        } else {
-            return false;
+        if (Files.exists(emailFile)) {
+            Files.delete(emailFile);
+            return true;
         }
+        return false;
     }
 
     public static void markEmailAsRead(int emailId, String userEmail) throws IOException {

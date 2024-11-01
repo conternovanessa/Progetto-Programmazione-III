@@ -15,10 +15,6 @@ public class EmailAccount {
         this.sent = FXCollections.observableArrayList();
     }
 
-    public String getEmailAddress() {
-        return emailAddress;
-    }
-
     public ObservableList<Email> getInbox() {
         return inbox;
     }
@@ -35,22 +31,4 @@ public class EmailAccount {
         sent.add(email);
     }
 
-    public boolean removeEmail(long emailId) {
-        return inbox.removeIf(email -> email.getId() == emailId) ||
-                sent.removeIf(email -> email.getId() == emailId);
-    }
-
-    public Email getEmailById(long id) {
-        for (Email email : inbox) {
-            if (email.getId() == id) {
-                return email;
-            }
-        }
-        for (Email email : sent) {
-            if (email.getId() == id) {
-                return email;
-            }
-        }
-        return null;
-    }
 }

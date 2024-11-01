@@ -29,55 +29,50 @@ public class MailServer {
         String sender = email.getSender();
         List<String> recipients = email.getRecipients();
 
-        // Create accounts if they don't exist
         createAccount(sender);
         recipients.forEach(this::createAccount);
 
-        // Determine email type
-        String emailType = determineEmailType(email);
+        // Generate a single ID for all copies of the email
+        int emailId = EmailFileManager.getNextId();
+        email.setId(emailId);
 
-        // Assign a new ID to the email
-        int newId = EmailFileManager.getNextId();
-        email.setId(newId);
-
-        // Save the email in recipients' inboxes and sender's sent folder
-        boolean allSaved = true;
+        // Save copies for all recipients with the same ID
         for (String recipient : recipients) {
-            accounts.get(recipient).addToInbox(email);
+            Email recipientCopy = createEmailCopy(email);
+            // Keep the same ID for all copies
+            recipientCopy.setId(emailId);
+            accounts.get(recipient).addToInbox(recipientCopy);
             try {
-                EmailFileManager.saveEmail(email, recipient);
+                EmailFileManager.saveEmail(recipientCopy, recipient);
             } catch (IOException e) {
-                allSaved = false;
                 serverController.logEvent("Error saving email for " + recipient + ": " + e.getMessage());
             }
         }
 
-        // Add the email to sender's sent folder
-        accounts.get(sender).addToSent(email);
+        // Save sender's copy with the same ID
+        Email senderCopy = createEmailCopy(email);
+        senderCopy.setId(emailId);
+        accounts.get(sender).addToSent(senderCopy);
         try {
-            EmailFileManager.saveEmail(email, sender);
+            EmailFileManager.saveEmail(senderCopy, sender);
         } catch (IOException e) {
-            allSaved = false;
             serverController.logEvent("Error saving sent email for " + sender + ": " + e.getMessage());
         }
 
-        // Log the email action
-        String recipientsStr = recipients.stream().collect(Collectors.joining(", "));
-        if (allSaved) {
-            serverController.logEvent(emailType + " (ID: " + newId + ") sent by " + sender + " to " + recipientsStr);
-        } else {
-            serverController.logEvent(emailType + " (ID: " + newId + ") partially sent by " + sender + " to " + recipientsStr + " (some errors occurred)");
-        }
+        String recipientsStr = String.join(", ", recipients);
+        serverController.logEvent("Email (ID: " + emailId + ") sent by " + sender + " to " + recipientsStr);
     }
 
-    private String determineEmailType(Email email) {
-        if (email.getSubject().toLowerCase().startsWith("re:")) {
-            return "Reply email";
-        } else if (email.getSubject().toLowerCase().startsWith("fwd:")) {
-            return "Forwarded email";
-        } else {
-            return "New email";
-        }
+    private Email createEmailCopy(Email original) {
+        Email copy = new Email();
+        copy.setId(original.getId());
+        copy.setSender(original.getSender());
+        copy.setRecipients(new ArrayList<>(original.getRecipients()));
+        copy.setSubject(original.getSubject());
+        copy.setBody(original.getBody());
+        copy.setSentDate(original.getSentDate());
+        copy.setRead(false);
+        return copy;
     }
 
     public List<Email> getNewEmails(String recipient) {
@@ -85,83 +80,26 @@ public class MailServer {
         return new ArrayList<>(accounts.get(recipient).getInbox());
     }
 
-    public synchronized boolean deleteEmail(Long emailId, String requestingUser) {
-        try {
-            Email email = getEmailById(emailId);
-            if (email == null) {
-                return false;
-            }
 
-            // Verifica i permessi
-            boolean isSender = email.getSender().equals(requestingUser);
-            boolean isRecipient = email.getRecipients().contains(requestingUser);
-
-            if (!isSender && !isRecipient) {
-                return false;
-            }
-
-            // Elimina l'email dal filesystem per l'utente richiedente
-            String userDirectory = System.getProperty("user.home") +
-                    File.separator + "EmailApp" +
-                    File.separator + requestingUser;
-            File emailFile = new File(userDirectory, "email_" + emailId + ".txt");
-
-            if (emailFile.exists()) {
-                return emailFile.delete();
-            }
-
-            return true;
-        } catch (Exception e) {
-            e.printStackTrace();
+    public synchronized boolean deleteEmail(int emailId, String requestingUser) {
+        EmailAccount account = accounts.get(requestingUser);
+        if (account == null) {
             return false;
         }
-    }
 
-    public Email getEmailById(Long emailId) {
-        if (emailId == null) {
-            return null;
-        }
+        boolean deletedFromInbox = account.getInbox().removeIf(email -> email.getId() == emailId);
+        boolean deletedFromSent = account.getSent().removeIf(email -> email.getId() == emailId);
 
-        // First check emails in memory
-        for (EmailAccount account : accounts.values()) {
-            // Check inbox emails
-            for (Email email : account.getInbox()) {
-                if (email.getId() == emailId) {
-                    return email;
-                }
-            }
-
-            // Check sent emails
-            for (Email email : account.getSent()) {
-                if (email.getId() == emailId) {
-                    return email;
-                }
+        if (deletedFromInbox || deletedFromSent) {
+            try {
+                EmailFileManager.deleteEmail(emailId, requestingUser);
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
             }
         }
-
-        // If not found in memory, try to load from disk by checking all user directories
-        File emailAppDir = new File(System.getProperty("user.home"), "EmailApp");
-        if (emailAppDir.exists() && emailAppDir.isDirectory()) {
-            for (File userDir : emailAppDir.listFiles()) {
-                if (userDir.isDirectory()) {
-                    String userEmail = userDir.getName();
-                    try {
-                        List<Email> userEmails = EmailFileManager.loadEmails(userEmail);
-                        for (Email email : userEmails) {
-                            if (email.getId() == emailId) {
-                                return email;
-                            }
-                        }
-                    } catch (IOException e) {
-                        serverController.logEvent("Error loading emails for user " + userEmail + ": " + e.getMessage());
-                    }
-                }
-            }
-        }
-
-        return null;
+        return false;
     }
-    public Map<String, EmailAccount> getAccounts() {
-        return accounts;
-    }
+
 }

@@ -26,10 +26,7 @@ public class Mailbox {
         this.receivedEmails = FXCollections.observableArrayList();
         this.sentEmails = FXCollections.observableArrayList();
         this.executorService = Executors.newCachedThreadPool();
-
     }
-
-
 
     public synchronized void loadEmailsFromDisk() {
         executorService.submit(() -> {
@@ -52,7 +49,6 @@ public class Mailbox {
             }
         });
     }
-
 
     public void setEmailAddress(String emailAddress) {
         if (!this.emailAddress.equals(emailAddress)) {
@@ -90,11 +86,10 @@ public class Mailbox {
     }
 
     public synchronized void addSentEmail(Email email) {
-        if (!hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
+        if (!hasEmail(email.getId())) {
             sentEmails.add(email);
         }
     }
-
 
     public ObservableList<Email> getAllEmails() {
         ObservableList<Email> allEmails = FXCollections.observableArrayList();
@@ -112,20 +107,15 @@ public class Mailbox {
         sentEmails.removeIf(e -> e.getId() == email.getId());
     }
 
-
-
-    public synchronized boolean hasEmail(long emailId) {
+    public synchronized boolean hasEmail(int emailId) {
         return receivedEmails.stream().anyMatch(e -> e.getId() == emailId) ||
                 sentEmails.stream().anyMatch(e -> e.getId() == emailId);
     }
-
-
 
     public void clearAllEmails() {
         receivedEmails.clear();
         sentEmails.clear();
     }
-
 
     @Override
     public String toString() {

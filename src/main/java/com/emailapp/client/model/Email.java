@@ -38,7 +38,6 @@ public class Email implements Serializable {
     public String getSubject() { return subject; }
     public String getBody() { return body; }
     public LocalDateTime getSentDate() { return sentDate; }
-    public boolean isDeleted() { return deleted; }
     public boolean isRead() { return read; }
 
     // Setters
@@ -48,7 +47,6 @@ public class Email implements Serializable {
     public void setSubject(String subject) { this.subject = subject; }
     public void setBody(String body) { this.body = body; }
     public void setSentDate(LocalDateTime sentDate) { this.sentDate = sentDate; }
-    public void setDeleted(boolean deleted) { this.deleted = deleted; }
     public void setRead(boolean read) { this.read = read; }
 
     public boolean isEmpty() {

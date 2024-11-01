@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 public class ClientController {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
-    private static final long ALERT_INTERVAL_SECONDS = 30;
     private Timeline autoRefreshTimeline;
     @FXML private Label emailAddressLabel;
     @FXML private Label connectionStatusLabel;
@@ -55,10 +54,11 @@ public class ClientController {
     private final Mailbox mailbox;
     private static ExecutorService executorService;
     private final BooleanProperty connectedProperty;
-    private Instant lastAlertTime = Instant.MIN;
+
     private Set<String> validEmails;
     private final Object lock = new Object();
     private boolean isComposeViewVisible = false;
+    private Set<Integer> deletedEmailIds = new HashSet<>();
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -415,7 +415,9 @@ public class ClientController {
                 synchronized (lock) {
                     int newEmailCount = 0;
                     for (Email email : newEmails) {
-                        if (!mailbox.hasEmail(Long.parseLong(String.valueOf(email.getId())))) {
+                        // Skip emails that were previously deleted
+                        if (!deletedEmailIds.contains(email.getId()) &&
+                                !mailbox.hasEmail(email.getId())) {
                             mailbox.addReceivedEmail(email);
                             newEmailCount++;
                         }
@@ -439,6 +441,8 @@ public class ClientController {
             }
         }
     }
+
+
 
     @FXML
     private void handleReplyEmail() {
@@ -471,116 +475,54 @@ public class ClientController {
     private void handleDeleteEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
-            Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
-            confirmAlert.setTitle("Conferma Eliminazione");
-            confirmAlert.setHeaderText("Elimina Email");
-            confirmAlert.setContentText("Sei sicuro di voler eliminare questa email?");
+            Alert confirmDelete = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmDelete.setTitle("Conferma eliminazione");
+            confirmDelete.setHeaderText("Eliminare questa email?");
+            confirmDelete.setContentText("Questa operazione non può essere annullata.");
 
-            Optional<ButtonType> result = confirmAlert.showAndWait();
+            Optional<ButtonType> result = confirmDelete.showAndWait();
             if (result.isPresent() && result.get() == ButtonType.OK) {
                 deleteEmail(selectedEmail);
             }
         }
     }
 
-
     private void deleteEmail(Email email) {
-        executorService.submit(() -> {
-            try {
-                String currentUser = mailbox.getEmailAddress();
-
-                // Verifica dei permessi
-                boolean isSender = email.getSender().equals(currentUser);
-                boolean isRecipient = email.getRecipients().contains(currentUser);
-
-                if (!isSender && !isRecipient) {
-                    Platform.runLater(() -> {
-                        showErrorAlert("Errore di Eliminazione",
-                                "Non hai i permessi per eliminare questa email.");
-                    });
-                    return;
-                }
-
-                // Prima verifichiamo se l'email esiste localmente
-                String userDirectory = System.getProperty("user.home") +
-                        File.separator + "EmailApp" +
-                        File.separator + mailbox.getEmailAddress();
-                File emailFile = new File(userDirectory, "email_" + email.getId() + ".txt");
-
-                if (!emailFile.exists()) {
-                    Platform.runLater(() -> {
-                        mailbox.removeEmail(email);
-                        refreshEmailTable();
-                        showWarningAlert("Attenzione",
-                                "L'email non è più presente nel sistema.");
-                    });
-                    return;
-                }
-
-                // Procedi con l'eliminazione dal server
-                boolean deletedFromServer = deleteEmailFromServer(email);
-
-                if (deletedFromServer) {
-                    // Se l'eliminazione dal server ha successo, procedi con l'eliminazione locale
-                    boolean locallyDeleted = EmailFileManager.deleteEmail(email.getId(), currentUser);
-
-                    if (locallyDeleted) {
-                        Platform.runLater(() -> {
-                            mailbox.removeEmail(email);
-                            refreshEmailTable();
-                            returnToEmailListView();
-                            showInfoAlert("Email Eliminata",
-                                    "L'email è stata eliminata con successo.");
-                        });
-                    }
-                }
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    showErrorAlert("Errore di Eliminazione",
-                            "Si è verificato un errore durante l'eliminazione dell'email: " +
-                                    e.getMessage());
-                });
-            }
-        });
-    }
-
-    private void showWarningAlert(String title, String content) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle(title);
-            alert.setHeaderText(null);
-            alert.setContentText(content);
-            alert.showAndWait();
-        });
+        if (deleteEmailFromServer(email)) {
+            mailbox.removeEmail(email);
+            deletedEmailIds.add(email.getId());
+            refreshEmailTable();
+            returnToEmailListView();
+            showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
+        } else {
+            showErrorAlert("Errore", "Impossibile eliminare l'email.");
+        }
     }
 
     private boolean deleteEmailFromServer(Email email) {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            socket.setSoTimeout(30000);
-
-            // Invia il comando di delete
+        Socket socket = null;
+        try {
+            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
             NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-
-            // Invia solo l'ID dell'email e l'utente richiedente
             NetworkUtils.sendObject(socket, email.getId());
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
-            Object response = NetworkUtils.receiveObject(socket);
-
-            if (response instanceof Boolean) {
-                return (Boolean) response;
-            } else if (response instanceof String) {
-                Platform.runLater(() -> showErrorAlert("Errore Server", (String) response));
-                return false;
-            }
-            return false;
+            String response = (String) NetworkUtils.receiveObject(socket);
+            return "OK".equals(response);
         } catch (Exception e) {
-            e.printStackTrace();
-            Platform.runLater(() -> showErrorAlert("Errore di Sistema",
-                    "Si è verificato un errore durante l'eliminazione: " + e.getMessage()));
+            handleConnectionError(e);
             return false;
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    System.err.println("Errore chiusura socket: " + e.getMessage());
+                }
+            }
         }
     }
+
 
     private void openComposeWindow(Email selectedEmail, String mode) {
         // Show composition view

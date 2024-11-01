@@ -187,36 +187,19 @@ public class ServerController {
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        try {
-            Long emailId = (Long) NetworkUtils.receiveObject(clientSocket);
-            String requestingUser = (String) NetworkUtils.receiveObject(clientSocket);
+        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+        String requestingUser = (String) NetworkUtils.receiveObject(clientSocket);
 
-            // Verifica se l'utente ha i permessi per eliminare l'email
-            Email email = mailServer.getEmailById(emailId);
-            if (email == null) {
-                NetworkUtils.sendObject(clientSocket, "Email non trovata");
-                return;
-            }
+        boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
+        NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
 
-            // Verifica se l'utente è il mittente o uno dei destinatari
-            if (!email.getSender().equals(requestingUser) &&
-                    !email.getRecipients().contains(requestingUser)) {
-                NetworkUtils.sendObject(clientSocket, "Permessi insufficienti per eliminare l'email");
-                return;
-            }
-
-            boolean success = mailServer.deleteEmail(emailId, requestingUser);
-            if (success) {
-                NetworkUtils.sendObject(clientSocket, true);
-                logEvent("Email " + emailId + " eliminata con successo da " + requestingUser);
-            } else {
-                NetworkUtils.sendObject(clientSocket, "Impossibile eliminare l'email");
-            }
-        } catch (Exception e) {
-            logEvent("Errore durante l'eliminazione dell'email: " + e.getMessage());
-            NetworkUtils.sendObject(clientSocket, "Errore durante l'eliminazione: " + e.getMessage());
+        if (deleted) {
+            logEvent("Email " + emailId + " deleted by user " + requestingUser);
+        } else {
+            logEvent("Failed to delete email " + emailId + " for user " + requestingUser);
         }
     }
+
 
     @FXML
     public void handleStopServer() {
