@@ -1,7 +1,0 @@
-Id: 4
-From: fabiodelia@progetto.com
-To: filippoditto@progetto.com, vanessaconterno@progetto.com
-Subject: sis
-Date: 2024-11-01T12:00:19.827927500
-Read: false
-Body: sus

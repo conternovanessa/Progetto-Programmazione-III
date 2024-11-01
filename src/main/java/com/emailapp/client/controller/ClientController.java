@@ -583,21 +583,47 @@ public class ClientController {
     }
 
     private void openComposeWindow(Email selectedEmail, String mode) {
-        // Mostrar a tela de composição
+        // Show composition view
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
         emailTableView.setVisible(false);
         actionButtons.setVisible(false);
 
+        // Pre-fill fields based on mode
+        switch (mode) {
+            case "Reply":
+                toField.setText(selectedEmail.getSender());
+                subjectField.setText("Re: " + selectedEmail.getSubject());
+                bodyArea.setText("\n\n----- Original Message -----\n" + selectedEmail.getBody());
+                break;
 
+            case "Reply All":
+                // Get all recipients except current user
+                List<String> allRecipients = new ArrayList<>(selectedEmail.getRecipients());
+                allRecipients.add(selectedEmail.getSender());
+                allRecipients.remove(mailbox.getEmailAddress());
+                toField.setText(String.join(", ", allRecipients));
+                subjectField.setText("Re: " + selectedEmail.getSubject());
+                bodyArea.setText("\n\n----- Original Message -----\n" + selectedEmail.getBody());
+                break;
 
-        // Definir a ação do botão de envio
-        sendButton.setOnAction(event -> {
-            handleSendEmail();
+            case "Forward":
+                toField.setText("");
+                subjectField.setText("Fwd: " + selectedEmail.getSubject());
+                String forwardedContent = "\n\n----- Forwarded Message -----\n" +
+                        "From: " + selectedEmail.getSender() + "\n" +
+                        "Date: " + selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n" +
+                        "Subject: " + selectedEmail.getSubject() + "\n" +
+                        "To: " + String.join(", ", selectedEmail.getRecipients()) + "\n\n" +
+                        selectedEmail.getBody();
+                bodyArea.setText(forwardedContent);
+                break;
+        }
 
-        });
+        // Set up send button action
+        sendButton.setOnAction(event -> handleSendEmail());
 
-
+        // Configure layout
         emailTableView.setVisible(true);
         detailOrComposeStack.getChildren().setAll(composeView);
         composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
