@@ -1,7 +1,7 @@
 Id: 4
-From: vanessaconterno@progetto.com
-To: filippoditto@progetto.com
-Subject: buibiubu
-Date: 2024-10-30T17:04:45.062124800
+From: fabiodelia@progetto.com
+To: filippoditto@progetto.com, vanessaconterno@progetto.com
+Subject: sis
+Date: 2024-11-01T12:00:19.827927500
 Read: false
-Body: jbvvhjv
+Body: sus

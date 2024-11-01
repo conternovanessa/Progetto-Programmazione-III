@@ -4,6 +4,7 @@ import com.emailapp.client.model.Email;
 import com.emailapp.server.controller.ServerController;
 import com.emailapp.util.EmailFileManager;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -84,27 +85,82 @@ public class MailServer {
         return new ArrayList<>(accounts.get(recipient).getInbox());
     }
 
-    public boolean deleteEmail(int emailId, String userEmail) {
-        EmailAccount account = accounts.get(userEmail);
-        if (account != null) {
-            Email emailToDelete = account.getEmailById(emailId);
-            if (emailToDelete != null) {
-                boolean deleted = account.removeEmail(emailId);
-                if (deleted) {
-                    try {
-                        EmailFileManager.deleteEmail(emailId, userEmail);
-                        serverController.logEvent("Email (ID: " + emailId + ") deleted for user: " + userEmail);
-                    } catch (IOException e) {
-                        serverController.logEvent("Failed to delete email file for ID: " + emailId + " in account: " + userEmail);
-                        e.printStackTrace();
-                    }
-                }
-                return deleted;
+    public synchronized boolean deleteEmail(Long emailId, String requestingUser) {
+        try {
+            Email email = getEmailById(emailId);
+            if (email == null) {
+                return false;
             }
+
+            // Verifica i permessi
+            boolean isSender = email.getSender().equals(requestingUser);
+            boolean isRecipient = email.getRecipients().contains(requestingUser);
+
+            if (!isSender && !isRecipient) {
+                return false;
+            }
+
+            // Elimina l'email dal filesystem per l'utente richiedente
+            String userDirectory = System.getProperty("user.home") +
+                    File.separator + "EmailApp" +
+                    File.separator + requestingUser;
+            File emailFile = new File(userDirectory, "email_" + emailId + ".txt");
+
+            if (emailFile.exists()) {
+                return emailFile.delete();
+            }
+
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
         }
-        return false;
     }
 
+    public Email getEmailById(Long emailId) {
+        if (emailId == null) {
+            return null;
+        }
+
+        // First check emails in memory
+        for (EmailAccount account : accounts.values()) {
+            // Check inbox emails
+            for (Email email : account.getInbox()) {
+                if (email.getId() == emailId) {
+                    return email;
+                }
+            }
+
+            // Check sent emails
+            for (Email email : account.getSent()) {
+                if (email.getId() == emailId) {
+                    return email;
+                }
+            }
+        }
+
+        // If not found in memory, try to load from disk by checking all user directories
+        File emailAppDir = new File(System.getProperty("user.home"), "EmailApp");
+        if (emailAppDir.exists() && emailAppDir.isDirectory()) {
+            for (File userDir : emailAppDir.listFiles()) {
+                if (userDir.isDirectory()) {
+                    String userEmail = userDir.getName();
+                    try {
+                        List<Email> userEmails = EmailFileManager.loadEmails(userEmail);
+                        for (Email email : userEmails) {
+                            if (email.getId() == emailId) {
+                                return email;
+                            }
+                        }
+                    } catch (IOException e) {
+                        serverController.logEvent("Error loading emails for user " + userEmail + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
     public Map<String, EmailAccount> getAccounts() {
         return accounts;
     }

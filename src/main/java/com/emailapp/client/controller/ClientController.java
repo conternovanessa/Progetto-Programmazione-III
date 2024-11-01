@@ -221,8 +221,14 @@ public class ClientController {
 
     @FXML
     private void handleComposeEmail() {
-        // Impostare la variabile di stato
+        // Reset dello stato e pulizia dei campi
+        clearComposeFields();
         isComposeViewVisible = true;
+
+        // Assicurarsi che la view di composizione sia nel posto giusto
+        if (!detailOrComposeStack.getChildren().contains(composeView)) {
+            detailOrComposeStack.getChildren().add(composeView);
+        }
 
         // Mostrare la sezione di composizione
         composeView.setVisible(true);
@@ -234,10 +240,8 @@ public class ClientController {
         composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
         composeView.prefHeightProperty().bind(detailOrComposeStack.heightProperty());
 
-        // Definire l'azione del pulsante di invio
-        sendButton.setOnAction(event -> {
-            handleSendEmail();
-        });
+        // Ridefinire l'azione del pulsante di invio
+        sendButton.setOnAction(event -> handleSendEmail());
     }
 
     private void displayEmailDetails(Email email) {
@@ -261,28 +265,25 @@ public class ClientController {
 
     @FXML
     private void handleBackButton() {
-        // Verificare la visibilità della sezione di composizione
-        if (isComposeViewVisible) {
-            // Nascondere la sezione di composizione
-            composeView.setVisible(false);
-            isComposeViewVisible = false;
-        }
+        // Reset dello stato
+        isComposeViewVisible = false;
 
-        // Nascondere i dettagli dell'email
+        // Slegare i binding delle dimensioni
+        composeView.prefWidthProperty().unbind();
+        composeView.prefHeightProperty().unbind();
+
+        // Nascondere tutte le viste secondarie
+        composeView.setVisible(false);
         emailDetailFlow.setVisible(false);
-
-        // Mostrare la tabella delle email se era visibile in precedenza
-        if (!composeView.isVisible()) {
-            emailTableView.setVisible(true);
-        }
-
-        // Nascondere i pulsanti di azione
         actionButtons.setVisible(false);
 
-        // Pulire il pannello a destra
+        // Mostrare la tabella delle email
+        emailTableView.setVisible(true);
+
+        // Pulire il contenitore dei dettagli
         detailOrComposeStack.getChildren().clear();
 
-        // Aggiornare la tabella delle email
+        // Aggiornare la tabella
         refreshEmailTable();
     }
 
@@ -343,10 +344,12 @@ public class ClientController {
 
 
     private void clearComposeFields() {
-        toField.clear();
-        subjectField.clear();
-        bodyArea.clear();
+        // Pulire tutti i campi di input
+        if (toField != null) toField.clear();
+        if (subjectField != null) subjectField.clear();
+        if (bodyArea != null) bodyArea.clear();
     }
+
 
     private boolean validateFields() {
         if (toField.getText().isEmpty()) {
@@ -484,72 +487,100 @@ public class ClientController {
     private void deleteEmail(Email email) {
         executorService.submit(() -> {
             try {
-                // Attempt to delete the email file locally
-                boolean locallyDeleted = EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
+                String currentUser = mailbox.getEmailAddress();
 
-                if (locallyDeleted) {
-                    // If local deletion was successful, attempt to delete from the server
-                    boolean deletedFromServer = deleteEmailFromServer(email);
+                // Verifica dei permessi
+                boolean isSender = email.getSender().equals(currentUser);
+                boolean isRecipient = email.getRecipients().contains(currentUser);
 
+                if (!isSender && !isRecipient) {
                     Platform.runLater(() -> {
-                        // Remove the email from the mailbox and update the UI
+                        showErrorAlert("Errore di Eliminazione",
+                                "Non hai i permessi per eliminare questa email.");
+                    });
+                    return;
+                }
+
+                // Prima verifichiamo se l'email esiste localmente
+                String userDirectory = System.getProperty("user.home") +
+                        File.separator + "EmailApp" +
+                        File.separator + mailbox.getEmailAddress();
+                File emailFile = new File(userDirectory, "email_" + email.getId() + ".txt");
+
+                if (!emailFile.exists()) {
+                    Platform.runLater(() -> {
                         mailbox.removeEmail(email);
                         refreshEmailTable();
-                        returnToEmailListView();
+                        showWarningAlert("Attenzione",
+                                "L'email non è più presente nel sistema.");
+                    });
+                    return;
+                }
 
-                        // Show success message
-                        showInfoAlert("Email Eliminata", "L'email è stata eliminata con successo.");
-                    });
-                } else {
-                    Platform.runLater(() -> {
-                        showErrorAlert("Errore di Eliminazione", "Impossibile eliminare l'email. Riprova più tardi.");
-                    });
+                // Procedi con l'eliminazione dal server
+                boolean deletedFromServer = deleteEmailFromServer(email);
+
+                if (deletedFromServer) {
+                    // Se l'eliminazione dal server ha successo, procedi con l'eliminazione locale
+                    boolean locallyDeleted = EmailFileManager.deleteEmail(email.getId(), currentUser);
+
+                    if (locallyDeleted) {
+                        Platform.runLater(() -> {
+                            mailbox.removeEmail(email);
+                            refreshEmailTable();
+                            returnToEmailListView();
+                            showInfoAlert("Email Eliminata",
+                                    "L'email è stata eliminata con successo.");
+                        });
+                    }
                 }
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    showErrorAlert("Errore di Eliminazione", "Si è verificato un errore durante l'eliminazione dell'email: " + e.getMessage());
+                    showErrorAlert("Errore di Eliminazione",
+                            "Si è verificato un errore durante l'eliminazione dell'email: " +
+                                    e.getMessage());
                 });
             }
         });
     }
 
+    private void showWarningAlert(String title, String content) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(content);
+            alert.showAndWait();
+        });
+    }
+
     private boolean deleteEmailFromServer(Email email) {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            socket.setSoTimeout(30000); // 30 seconds timeout
+            socket.setSoTimeout(30000);
 
+            // Invia il comando di delete
             NetworkUtils.sendObject(socket, "DELETE_EMAIL");
+
+            // Invia solo l'ID dell'email e l'utente richiedente
             NetworkUtils.sendObject(socket, email.getId());
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
             Object response = NetworkUtils.receiveObject(socket);
+
             if (response instanceof Boolean) {
                 return (Boolean) response;
-            } else {
-                System.err.println("Unexpected response type from server: " + response.getClass().getName());
+            } else if (response instanceof String) {
+                Platform.runLater(() -> showErrorAlert("Errore Server", (String) response));
                 return false;
             }
+            return false;
         } catch (Exception e) {
-            System.err.println("Error deleting email from server: " + e.getMessage());
+            e.printStackTrace();
+            Platform.runLater(() -> showErrorAlert("Errore di Sistema",
+                    "Si è verificato un errore durante l'eliminazione: " + e.getMessage()));
             return false;
         }
     }
-
-    private boolean deleteLocalEmailFile(int emailId) {
-        String userDirectory = System.getProperty("user.home") + File.separator + "EmailApp" + File.separator + mailbox.getEmailAddress();
-        File emailFile = new File(userDirectory, "email_" + emailId + ".txt");
-
-        if (emailFile.exists()) {
-            return emailFile.delete();
-        } else {
-            return false;
-        }
-    }
-
-    private void showWarningAlert(String title, String content) {
-        showAlert(Alert.AlertType.WARNING, title, content);
-    }
-
-
 
     private void openComposeWindow(Email selectedEmail, String mode) {
         // Mostrar a tela de composição
@@ -594,21 +625,22 @@ public class ClientController {
 
     @FXML
     private void returnToEmailListView() {
-        // Verificare la visibilità della sezione di composizione
-        if (isComposeViewVisible) {
-            // Nascondere la sezione di composizione
-            composeView.setVisible(false);
-            isComposeViewVisible = false;
-        }
+        // Reset dello stato
+        isComposeViewVisible = false;
 
-        // Nascondere i dettagli dell'email
+        // Slegare i binding delle dimensioni
+        composeView.prefWidthProperty().unbind();
+        composeView.prefHeightProperty().unbind();
+
+        // Nascondere le viste secondarie
+        composeView.setVisible(false);
         emailDetailFlow.setVisible(false);
         actionButtons.setVisible(false);
 
         // Mostrare la tabella delle email
         emailTableView.setVisible(true);
 
-        // Pulire il pannello a destra
+        // Pulire il contenitore dei dettagli
         detailOrComposeStack.getChildren().clear();
 
         // Reimpostare il layout
@@ -616,11 +648,12 @@ public class ClientController {
         emailTableView.setMaxWidth(Double.MAX_VALUE);
         emailTableView.setMaxHeight(Double.MAX_VALUE);
 
-        // Aggiornare la tabella delle email
+        // Aggiornare la vista
         refreshEmailTable();
         emailTableView.requestLayout();
         detailOrComposeStack.requestLayout();
     }
+
 
     public boolean isConnected() {
         return connectedProperty.get();

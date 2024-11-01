@@ -187,30 +187,34 @@ public class ServerController {
     }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        Integer emailId = null;
-        String userEmail = null;
-        boolean success = false;
-
         try {
-            emailId = (Integer) NetworkUtils.receiveObject(clientSocket);
-            userEmail = (String) NetworkUtils.receiveObject(clientSocket);
-            success = mailServer.deleteEmail(emailId, userEmail);
-            NetworkUtils.sendObject(clientSocket, success);
-            logEvent("Email deletion " + (success ? "successful" : "failed") + " for ID: " + emailId + " and user: " + userEmail);
+            Long emailId = (Long) NetworkUtils.receiveObject(clientSocket);
+            String requestingUser = (String) NetworkUtils.receiveObject(clientSocket);
+
+            // Verifica se l'utente ha i permessi per eliminare l'email
+            Email email = mailServer.getEmailById(emailId);
+            if (email == null) {
+                NetworkUtils.sendObject(clientSocket, "Email non trovata");
+                return;
+            }
+
+            // Verifica se l'utente è il mittente o uno dei destinatari
+            if (!email.getSender().equals(requestingUser) &&
+                    !email.getRecipients().contains(requestingUser)) {
+                NetworkUtils.sendObject(clientSocket, "Permessi insufficienti per eliminare l'email");
+                return;
+            }
+
+            boolean success = mailServer.deleteEmail(emailId, requestingUser);
+            if (success) {
+                NetworkUtils.sendObject(clientSocket, true);
+                logEvent("Email " + emailId + " eliminata con successo da " + requestingUser);
+            } else {
+                NetworkUtils.sendObject(clientSocket, "Impossibile eliminare l'email");
+            }
         } catch (Exception e) {
-            logEvent("Error during email deletion: " + e.getMessage());
-            NetworkUtils.sendObject(clientSocket, false);
-        } finally {
-            if (emailId == null || userEmail == null) {
-                NetworkUtils.sendObject(clientSocket, false);
-            }
-            if (clientSocket != null && !clientSocket.isClosed()) {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    logEvent("Error closing socket in handleDeleteEmail: " + e.getMessage());
-                }
-            }
+            logEvent("Errore durante l'eliminazione dell'email: " + e.getMessage());
+            NetworkUtils.sendObject(clientSocket, "Errore durante l'eliminazione: " + e.getMessage());
         }
     }
 
