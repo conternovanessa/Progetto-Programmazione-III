@@ -476,7 +476,6 @@ public class ClientController {
         }
     }
 
-
     @FXML
     private void handleDeleteEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
@@ -494,16 +493,30 @@ public class ClientController {
     }
 
     private void deleteEmail(Email email) {
-        if (deleteEmailFromServer(email)) {
-            mailbox.removeEmail(email);
-            deletedEmailIds.add(email.getId());
-            refreshEmailTable();
-            returnToEmailListView();
-            showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
-        } else {
-            showErrorAlert("Errore", "Impossibile eliminare l'email.");
-        }
+        executorService.submit(() -> {
+            try {
+                if (EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress())) {
+                    Platform.runLater(() -> {
+                        mailbox.removeEmail(email);
+                        deletedEmailIds.add(email.getId());
+                        refreshEmailTable();
+                        returnToEmailListView();
+                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
+                    });
+                } else {
+                    Platform.runLater(() -> {
+                        showErrorAlert("Errore", "Impossibile eliminare l'email.");
+                    });
+                }
+            } catch (IOException e) {
+                Platform.runLater(() -> {
+                    showErrorAlert("Errore", "Si è verificato un errore durante l'eliminazione dell'email: " + e.getMessage());
+                });
+                e.printStackTrace();
+            }
+        });
     }
+
 
     private boolean deleteEmailFromServer(Email email) {
         Socket socket = null;
