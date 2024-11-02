@@ -298,14 +298,40 @@ public class ClientController {
             showServerClosedAlert();
             return;
         }
-
         if (validateFields()) {
             String recipientsString = toField.getText().trim();
             List<String> recipients = Arrays.asList(recipientsString.split("\\s*,\\s*"));
-            boolean allValid = recipients.stream().allMatch(this::isValidRecipient);
 
-            if (!allValid) {
-                showErrorAlert("Indirizzo inesistente", "Uno o più indirizzi email forniti non sono presenti in emails.txt");
+            List<String> syntaxErrors = new ArrayList<>();
+            List<String> nonExistentAddresses = new ArrayList<>();
+
+            for (String recipient : recipients) {
+                if (!recipient.endsWith("@progetto.com")) {
+                    syntaxErrors.add(recipient);
+                } else if (!isValidRecipient(recipient)) {
+                    nonExistentAddresses.add(recipient);
+                }
+            }
+
+            if (!syntaxErrors.isEmpty()) {
+                StringBuilder errorMessage = new StringBuilder();
+                errorMessage.append("I seguenti indirizzi non hanno il formato corretto:\n\n");
+                for (String error : syntaxErrors) {
+                    errorMessage.append("• ").append(error)
+                            .append(" → formato corretto richiesto: \n nomeutente@progetto.com\n");
+                }
+                showErrorAlert("Errore di sintassi email", errorMessage.toString());
+                return;
+            }
+
+            if (!nonExistentAddresses.isEmpty()) {
+                StringBuilder errorMessage = new StringBuilder();
+                errorMessage.append("I seguenti indirizzi non sono registrati nel sistema:\n\n");
+                for (String address : nonExistentAddresses) {
+                    errorMessage.append("• ").append(address).append("\n");
+                }
+                errorMessage.append("\nVerifica che gli indirizzi siano presenti in emails.txt");
+                showErrorAlert("Indirizzi non trovati", errorMessage.toString());
                 return;
             }
 
@@ -314,14 +340,12 @@ public class ClientController {
             newEmail.setRecipients(recipients);
             newEmail.setSubject(subjectField.getText());
             newEmail.setBody(bodyArea.getText());
-
             synchronized (lock) {
                 sendEmail(newEmail);
             }
             returnToEmailListView();
         }
     }
-
 
     private boolean isValidRecipient(String email) {
         return validEmails.contains(email.trim());
@@ -509,7 +533,7 @@ public class ClientController {
     private void openComposeWindow(Email selectedEmail, String mode) {
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
-        emailTableView.setVisible(false);
+        emailTableView.setVisible(true);
         actionButtons.setVisible(false);
 
         switch (mode) {

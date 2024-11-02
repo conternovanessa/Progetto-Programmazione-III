@@ -5,9 +5,7 @@ import com.emailapp.util.NetworkUtils;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,6 +18,9 @@ import java.util.concurrent.TimeUnit;
 public class SpamGenerator extends JFrame {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
+    private static final int DELAY_BETWEEN_EMAILS = 500; // 500ms di ritardo tra le email
+    private static final int CONNECTION_TIMEOUT = 5000; // 5 secondi timeout
+
     private static final List<String> SPAM_SUBJECTS = Arrays.asList(
             "Offerta imperdibile!",
             "Hai vinto!",
@@ -27,6 +28,7 @@ public class SpamGenerator extends JFrame {
             "Promozione esclusiva",
             "Sconto speciale solo per te!"
     );
+
     private static final List<String> SPAM_BODIES = Arrays.asList(
             "Approfitta subito di questa offerta limitata!",
             "Sei stato selezionato per ricevere un premio esclusivo!",
@@ -35,10 +37,20 @@ public class SpamGenerator extends JFrame {
             "Acquista ora e ricevi uno sconto del 50% su tutti i prodotti!"
     );
 
+    private static final List<String> SPAM_SENDERS = Arrays.asList(
+            "offerte@spam.com",
+            "promozioni@spam.com",
+            "marketing@spam.com",
+            "sconti@spam.com",
+            "occasioni@spam.com"
+    );
+
     private ScheduledExecutorService scheduler;
     private final Random random = new Random();
     private final JButton toggleButton;
     private List<String> emailAddresses;
+    private volatile boolean isRunning;
+    private Socket currentSocket;
 
     public SpamGenerator() {
         super("Spam Generator");
@@ -52,6 +64,25 @@ public class SpamGenerator extends JFrame {
         add(toggleButton);
 
         loadEmailAddresses();
+
+        // Aggiungi un handler per la chiusura della finestra
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                cleanup();
+            }
+        });
+    }
+
+    private void cleanup() {
+        stopSpamming();
+        if (currentSocket != null && !currentSocket.isClosed()) {
+            try {
+                currentSocket.close();
+            } catch (IOException e) {
+                System.err.println("Errore nella chiusura del socket: " + e.getMessage());
+            }
+        }
     }
 
     private void loadEmailAddresses() {
@@ -68,12 +99,14 @@ public class SpamGenerator extends JFrame {
     }
 
     private void toggleSpamming() {
-        if (scheduler == null || scheduler.isShutdown()) {
+        if (!isRunning) {
             startSpamming();
             toggleButton.setText("Stop Spamming");
+            isRunning = true;
         } else {
             stopSpamming();
             toggleButton.setText("Start Spamming");
+            isRunning = false;
         }
     }
 
@@ -82,36 +115,101 @@ public class SpamGenerator extends JFrame {
             JOptionPane.showMessageDialog(this, "Nessun indirizzo email caricato. Impossibile iniziare a inviare spam.", "Errore", JOptionPane.ERROR_MESSAGE);
             return;
         }
+
+        // Inizializza la connessione
+        try {
+            currentSocket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            currentSocket.setSoTimeout(CONNECTION_TIMEOUT);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Errore nella connessione al server: " + e.getMessage(), "Errore", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(this::sendSpamToAllClients, 0, 5, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::sendMultipleSpamToOneClient, 0, 10, TimeUnit.SECONDS);
     }
 
     private void stopSpamming() {
-        if (scheduler != null) {
+        if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdown();
+            try {
+                scheduler.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // Chiudi la connessione
+        if (currentSocket != null && !currentSocket.isClosed()) {
+            try {
+                currentSocket.close();
+                currentSocket = null;
+            } catch (IOException e) {
+                System.err.println("Errore nella chiusura del socket: " + e.getMessage());
+            }
         }
     }
 
-    private void sendSpamToAllClients() {
-        for (String recipient : emailAddresses) {
-            sendSpamEmail(recipient);
+    private void sendMultipleSpamToOneClient() {
+        if (!isRunning || currentSocket == null || currentSocket.isClosed()) return;
+
+        // Scegli un destinatario casuale
+        String recipient = emailAddresses.get(random.nextInt(emailAddresses.size()));
+
+        // Invia multiple email da mittenti diversi
+        List<String> usedSenders = new ArrayList<>();
+        int numberOfEmails = 2 + random.nextInt(3); // Invia da 2 a 4 email
+
+        for (int i = 0; i < numberOfEmails && isRunning; i++) {
+            // Scegli un mittente non ancora utilizzato
+            String sender;
+            do {
+                sender = SPAM_SENDERS.get(random.nextInt(SPAM_SENDERS.size()));
+            } while (usedSenders.contains(sender));
+            usedSenders.add(sender);
+
+            sendSpamEmail(recipient, sender);
+
+            // Attendi un po' tra un invio e l'altro
+            try {
+                Thread.sleep(DELAY_BETWEEN_EMAILS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
     }
 
-    private void sendSpamEmail(String recipient) {
-        Email spamEmail = createSpamEmail(recipient);
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "SEND_EMAIL");
-            NetworkUtils.sendObject(socket, spamEmail);
-            String response = (String) NetworkUtils.receiveObject(socket);
+    private void sendSpamEmail(String recipient, String sender) {
+        if (currentSocket == null || currentSocket.isClosed()) {
+            System.err.println("Socket non disponibile per l'invio");
+            return;
+        }
+
+        Email spamEmail = createSpamEmail(recipient, sender);
+        try {
+            NetworkUtils.sendObject(currentSocket, "SEND_EMAIL");
+            NetworkUtils.sendObject(currentSocket, spamEmail);
         } catch (Exception e) {
-            System.err.println("Errore nell'invio dell'e-mail di spam a" + recipient + ": " + e.getMessage());
+            reconnect();
         }
     }
 
-    private Email createSpamEmail(String recipient) {
+    private void reconnect() {
+        try {
+            if (currentSocket != null && !currentSocket.isClosed()) {
+                currentSocket.close();
+            }
+            currentSocket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            currentSocket.setSoTimeout(CONNECTION_TIMEOUT);
+        } catch (IOException e) {
+            System.err.println("Errore durante la riconnessione al server: " + e.getMessage());
+        }
+    }
+
+    private Email createSpamEmail(String recipient, String sender) {
         Email email = new Email();
-        email.setSender("spammer@spam.com");
+        email.setSender(sender);
         email.setRecipients(List.of(recipient));
         email.setSubject(SPAM_SUBJECTS.get(random.nextInt(SPAM_SUBJECTS.size())));
         email.setBody(SPAM_BODIES.get(random.nextInt(SPAM_BODIES.size())));
