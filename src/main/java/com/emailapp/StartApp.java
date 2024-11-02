@@ -28,29 +28,23 @@ public class StartApp extends Application {
     @Override
     public void start(Stage primaryStage) {
         try {
-            // Inizializza il ClientManager
             clientManager = ClientManager.getInstance();
 
-            // Carica il file FXML per la vista del server
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/server/ServerView.fxml"));
             Parent root = loader.load();
 
-            // Ottiene il controller
             serverController = loader.getController();
 
-            // Crea la scena per la vista del server
             Scene scene = new Scene(root, 600, 400);
             primaryStage.setScene(scene);
             primaryStage.setTitle("Email Server");
             primaryStage.show();
 
-            // Leggi gli indirizzi email e avvia i client
             List<String> emailAddresses = readEmailAddresses();
             for (String email : emailAddresses) {
                 startClient(email);
             }
 
-            // Crea il pulsante per i client recenti
             createRecentClientsButton();
 
         } catch (IOException e) {
@@ -61,17 +55,16 @@ public class StartApp extends Application {
     }
 
     private void createRecentClientsButton() {
-        Button recentButton = new Button("Recent Clients");
+        Button recentButton = new Button("Client recenti");
         recentButton.setStyle("-fx-font-size: 14px; -fx-min-width: 120px;");
         recentButton.setOnAction(e -> clientManager.showRecentClientsWindow());
 
-        // Crea una piccola finestra sempre in primo piano per il pulsante
         Stage buttonStage = new Stage();
         buttonStage.initModality(Modality.NONE);
         buttonStage.setAlwaysOnTop(true);
         buttonStage.setX(10);
         buttonStage.setY(10);
-        buttonStage.setTitle("Recent Clients");
+        buttonStage.setTitle("Client recenti");
 
         VBox buttonBox = new VBox(recentButton);
         buttonBox.setPadding(new Insets(5));

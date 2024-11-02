@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.Objects;
 
 public class Email implements Serializable {
-    private static final long serialVersionUID = 2L; // Incrementato per la nuova versione della classe
+    private static final long serialVersionUID = 2L;
 
-    private int id; // Cambiato da long a int
+    private int id;
     private String sender;
     private List<String> recipients;
     private String subject;
@@ -31,8 +31,7 @@ public class Email implements Serializable {
         this.body = body;
     }
 
-    // Getters
-    public int getId() { return id; } // Rimosso il cast a (int)
+    public int getId() { return id; }
     public String getSender() { return sender; }
     public List<String> getRecipients() { return recipients; }
     public String getSubject() { return subject; }
@@ -40,8 +39,7 @@ public class Email implements Serializable {
     public LocalDateTime getSentDate() { return sentDate; }
     public boolean isRead() { return read; }
 
-    // Setters
-    public void setId(int id) { this.id = id; } // Cambiato da long a int
+    public void setId(int id) { this.id = id; }
     public void setSender(String sender) { this.sender = sender; }
     public void setRecipients(List<String> recipients) { this.recipients = recipients; }
     public void setSubject(String subject) { this.subject = subject; }
@@ -79,6 +77,6 @@ public class Email implements Serializable {
 
     @Override
     public int hashCode() {
-        return Integer.hashCode(id); // Cambiato da Long.hashCode a Integer.hashCode
+        return Integer.hashCode(id);
     }
 }

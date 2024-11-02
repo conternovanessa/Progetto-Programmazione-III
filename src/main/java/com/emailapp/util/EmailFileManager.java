@@ -55,7 +55,6 @@ public class EmailFileManager {
         Path userDir = Paths.get(BASE_DIR, userEmail);
         Files.createDirectories(userDir);
 
-        // Usa l'ID esistente dell'email invece di generarne uno nuovo
         String fileName = "Email_" + email.getId() + ".txt";
         Path filePath = userDir.resolve(fileName);
 
@@ -130,8 +129,8 @@ public class EmailFileManager {
         if (Files.exists(filePath)) {
             List<String> lines = Files.readAllLines(filePath);
             for (int i = 0; i < lines.size(); i++) {
-                if (lines.get(i).startsWith("Read:")) {
-                    lines.set(i, "Read: true");
+                if (lines.get(i).startsWith("Letto:")) {
+                    lines.set(i, "Letto: vero");
                     break;
                 }
             }

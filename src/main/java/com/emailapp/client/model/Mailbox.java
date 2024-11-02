@@ -45,7 +45,7 @@ public class Mailbox {
                 });
             } catch (IOException e) {
                 e.printStackTrace();
-                System.err.println("Error loading emails: " + e.getMessage());
+                System.err.println("Errore nel caricamento dei file:" + e.getMessage());
             }
         });
     }

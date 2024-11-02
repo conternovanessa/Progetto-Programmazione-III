@@ -49,7 +49,7 @@ public class ClientManager {
             client.setEmailAddress(email);
             client.start(new Stage());
         } catch (Exception e) {
-            showError("Error", "Could not reopen client for " + email);
+            showError("Errore", "Impossibiità di riaprire il client:  " + email);
         }
     }
 

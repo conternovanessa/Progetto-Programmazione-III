@@ -26,25 +26,24 @@ public class NetworkUtils {
 
     public static void sendObject(Socket socket, Object obj) throws IOException {
         if (socket.isClosed()) {
-            throw new SocketException("Socket is closed");
+            throw new SocketException("Socket chiusa");
         }
         ObjectOutputStream out = getOutputStream(socket);
         out.writeObject(obj);
         out.flush();
-        // Non chiudere lo stream qui
     }
 
     public static Object receiveObject(Socket socket) throws IOException, ClassNotFoundException {
         if (socket.isClosed()) {
-            throw new SocketException("Socket is closed");
+            throw new SocketException("Socket chiusa");
         }
         try {
             ObjectInputStream in = getInputStream(socket);
             return in.readObject();
         } catch (EOFException e) {
-            throw new SocketException("Connection closed while reading");
+            throw new SocketException("Connessione chiusa durante la lettura");
         } catch (SocketTimeoutException e) {
-            throw new SocketException("Timeout while waiting for server response");
+            throw new SocketException("Timeout durante l'attesa della risposta del server");
         }
     }
 }

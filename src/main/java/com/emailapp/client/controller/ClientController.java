@@ -41,12 +41,10 @@ public class ClientController {
     @FXML private TextField toField;
     @FXML private TextField subjectField;
     @FXML private TextArea bodyArea;
-    @FXML private VBox emailDetailView; // VBox for email details
-    @FXML private Label emailDetailLabel; // Label for email details
-    @FXML private HBox actionButtons; // HBox for action buttons (Reply, Reply All, Forward, Delete)
+    @FXML private HBox actionButtons;
     @FXML private TextFlow emailDetailFlow;
-    @FXML private VBox composeView; // For composing email
-    @FXML private StackPane detailOrComposeStack; // The StackPane that contains both views
+    @FXML private VBox composeView;
+    @FXML private StackPane detailOrComposeStack;
     @FXML private Button sendButton;
     @FXML private TextArea emailDetailTextArea;
 
@@ -59,6 +57,7 @@ public class ClientController {
     private final Object lock = new Object();
     private boolean isComposeViewVisible = false;
     private Set<Integer> deletedEmailIds = new HashSet<>();
+    private final Object emailOperationLock = new Object();
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -71,7 +70,6 @@ public class ClientController {
     public void initialize() {
         mailbox.setEmailLoadedCallback(this::refreshEmailTable);
 
-        // Set up cell value factories for all columns
         senderColumn.setCellValueFactory(new PropertyValueFactory<>("sender"));
         subjectColumn.setCellValueFactory(new PropertyValueFactory<>("subject"));
         dateColumn.setCellValueFactory(cellData -> {
@@ -80,7 +78,6 @@ public class ClientController {
             return javafx.beans.binding.Bindings.createStringBinding(() -> formattedDate);
         });
 
-        // Set up cell factories for all columns
         senderColumn.setCellFactory(this::createStyledCell);
         subjectColumn.setCellFactory(this::createStyledCell);
         dateColumn.setCellFactory(this::createStyledCell);
@@ -88,7 +85,7 @@ public class ClientController {
         emailTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         emailTableView.setItems(mailbox.getAllEmails());
         emailTableView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) { // Detect double-click
+            if (event.getClickCount() == 2) {
                 handleEmailSelection();
             }
         });
@@ -154,10 +151,10 @@ public class ClientController {
             }
         } catch (IOException e) {
             e.printStackTrace();
-            showErrorAlert("Error", "Failed to load valid email addresses from emails.txt.");
+            showErrorAlert("Errore", "\n" + "Impossibile caricare indirizzi email validi da emails.txt.");
         } catch (NullPointerException e) {
             e.printStackTrace();
-            showErrorAlert("Error", "emails.txt file not found in resources.");
+            showErrorAlert("Errore", "File emails.txt non trovato nelle risorse.");
         }
     }
 
@@ -214,33 +211,27 @@ public class ClientController {
                 EmailFileManager.markEmailAsRead(email.getId(), mailbox.getEmailAddress());
             } catch (IOException e) {
                 e.printStackTrace();
-                Platform.runLater(() -> showErrorAlert("Error", "Failed to mark email as read"));
             }
         });
     }
 
     @FXML
     private void handleComposeEmail() {
-        // Reset dello stato e pulizia dei campi
         clearComposeFields();
         isComposeViewVisible = true;
 
-        // Assicurarsi che la view di composizione sia nel posto giusto
         if (!detailOrComposeStack.getChildren().contains(composeView)) {
             detailOrComposeStack.getChildren().add(composeView);
         }
 
-        // Mostrare la sezione di composizione
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
         emailTableView.setVisible(false);
         actionButtons.setVisible(false);
 
-        // Impostare le dimensioni della sezione di composizione
         composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
         composeView.prefHeightProperty().bind(detailOrComposeStack.heightProperty());
 
-        // Ridefinire l'azione del pulsante di invio
         sendButton.setOnAction(event -> handleSendEmail());
     }
 
@@ -265,40 +256,33 @@ public class ClientController {
 
     @FXML
     private void handleBackButton() {
-        // Reset dello stato
         isComposeViewVisible = false;
 
-        // Slegare i binding delle dimensioni
         composeView.prefWidthProperty().unbind();
         composeView.prefHeightProperty().unbind();
 
-        // Nascondere tutte le viste secondarie
         composeView.setVisible(false);
         emailDetailFlow.setVisible(false);
         actionButtons.setVisible(false);
 
-        // Mostrare la tabella delle email
         emailTableView.setVisible(true);
 
-        // Pulire il contenitore dei dettagli
         detailOrComposeStack.getChildren().clear();
 
-        // Aggiornare la tabella
         refreshEmailTable();
     }
 
     private void loadEmailsFromDisk() {
         executorService.submit(() -> {
             try {
-                // Usa il corretto indirizzo email dell'utente
                 String userEmail = mailbox.getEmailAddress();
                 List<Email> loadedEmails = EmailFileManager.loadEmails(userEmail);
                 Platform.runLater(() -> {
-                    mailbox.clearEmails(); // Pulisce le email esistenti prima di aggiungere quelle caricate
+                    mailbox.clearEmails();
                     for (Email email : loadedEmails) {
                         mailbox.addReceivedEmail(email);
                     }
-                    emailTableView.refresh(); // Aggiorna la vista della tabella
+                    emailTableView.refresh();
                 });
             } catch (IOException e) {
                 e.printStackTrace();
@@ -310,6 +294,11 @@ public class ClientController {
 
     @FXML
     private synchronized void handleSendEmail() {
+        if (!isConnected()) {
+            showServerClosedAlert();
+            return;
+        }
+
         if (validateFields()) {
             String recipientsString = toField.getText().trim();
             List<String> recipients = Arrays.asList(recipientsString.split("\\s*,\\s*"));
@@ -317,11 +306,9 @@ public class ClientController {
 
             if (!allValid) {
                 showErrorAlert("Indirizzo inesistente", "Uno o più indirizzi email forniti non sono presenti in emails.txt");
-                // Non facciamo nulla dopo l'alert, lasciando tutto com'è
                 return;
             }
 
-            // Solo se arriviamo qui (tutto è valido) procediamo con l'invio
             Email newEmail = new Email();
             newEmail.setSender(mailbox.getEmailAddress());
             newEmail.setRecipients(recipients);
@@ -342,7 +329,6 @@ public class ClientController {
 
 
     private void clearComposeFields() {
-        // Pulire tutti i campi di input
         if (toField != null) toField.clear();
         if (subjectField != null) subjectField.clear();
         if (bodyArea != null) bodyArea.clear();
@@ -351,69 +337,69 @@ public class ClientController {
 
     private boolean validateFields() {
         if (toField.getText().isEmpty()) {
-            showErrorAlert("Invalid Recipient", "Please enter a recipient email address.");
+            showErrorAlert("Destinatario non valido.", "Inserisci l'indirizzo email del destinatario.");
             return false;
         }
         if (subjectField.getText().isEmpty()) {
-            showErrorAlert("Missing Subject", "Please enter a subject for your email.");
+            showErrorAlert("Oggetto mancante", "Inserisci un oggetto per la tua email.");
             return false;
         }
         if (bodyArea.getText().isEmpty()) {
-            showErrorAlert("Empty Message", "Please enter a message in the email body.");
+            showErrorAlert("Messaggio vuoto", "Inserisci un messaggio nel corpo dell'email.");
             return false;
         }
         return true;
     }
 
     private synchronized boolean sendEmail(Email email) {
-        Socket socket = null;
-        try {
-            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-            NetworkUtils.sendObject(socket, "SEND_EMAIL");
-            NetworkUtils.sendObject(socket, email);
-            String response = (String) NetworkUtils.receiveObject(socket);
+        synchronized (emailOperationLock) {
+            Socket socket = null;
+            try {
+                socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+                NetworkUtils.sendObject(socket, "SEND_EMAIL");
+                NetworkUtils.sendObject(socket, email);
+                String response = (String) NetworkUtils.receiveObject(socket);
 
-            if ("OK".equals(response)) {
-                Platform.runLater(() -> {
-                    mailbox.addSentEmail(email);
-                    refreshEmailTable();
-                    showInfoAlert("Email Inviata", "Email inviata correttamente a " + email.getRecipients());
-                });
-                return true;
-            } else {
-                Platform.runLater(() -> {
-                    showErrorAlert("Errore di Invio", "Impossibile inviare l'email: " + response);
-                });
+                if ("OK".equals(response)) {
+                    Platform.runLater(() -> {
+                        mailbox.addSentEmail(email);
+                        refreshEmailTable();
+                        showInfoAlert("Email Inviata", "Email inviata correttamente a " + email.getRecipients());
+                    });
+                    return true;
+                } else {
+                    Platform.runLater(() -> {
+                        showErrorAlert("Errore di Invio", "Impossibile inviare l'email: " + response);
+                    });
+                    return false;
+                }
+            } catch (Exception e) {
+                handleConnectionError(e);
                 return false;
-            }
-        } catch (Exception e) {
-            handleConnectionError(e);
-            return false;
-        } finally {
-            if (socket != null && !socket.isClosed()) {
-                try {
-                    socket.close();
-                } catch (IOException ex) {
-                    System.err.println("Errore chiusura socket: " + ex.getMessage());
+            } finally {
+                if (socket != null && !socket.isClosed()) {
+                    try {
+                        socket.close();
+                    } catch (IOException e) {
+                        System.err.println("Errore chiusura socket: " + e.getMessage());
+                    }
                 }
             }
         }
     }
 
     private synchronized void fetchNewEmails() {
-        Socket socket = null;
-        try {
-            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-            NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
-            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-            @SuppressWarnings("unchecked")
-            List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
+        synchronized (emailOperationLock) {
+            Socket socket = null;
+            try {
+                socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+                NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
+                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+                List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
 
-            Platform.runLater(() -> {
-                synchronized (lock) {
+                Platform.runLater(() -> {
                     int newEmailCount = 0;
                     for (Email email : newEmails) {
-                        // Skip emails that were previously deleted
                         if (!deletedEmailIds.contains(email.getId()) &&
                                 !mailbox.hasEmail(email.getId())) {
                             mailbox.addReceivedEmail(email);
@@ -422,25 +408,23 @@ public class ClientController {
                     }
                     if (newEmailCount > 0) {
                         refreshEmailTable();
-                        showInfoAlert("New Emails for: " + mailbox.getEmailAddress(),
-                                "Received " + newEmailCount + " new email(s)");
+                        showInfoAlert("Nuova mail per: " + mailbox.getEmailAddress(),
+                                "Ricevuta una nuova email");
                     }
-                }
-            });
-        } catch (Exception e) {
-            handleConnectionError(e);
-        } finally {
-            if (socket != null && !socket.isClosed()) {
-                try {
-                    socket.close();
-                } catch (IOException e) {
-                    System.err.println("Errore chiusura socket: " + e.getMessage());
+                });
+            } catch (Exception e) {
+                handleConnectionError(e);
+            } finally {
+                if (socket != null && !socket.isClosed()) {
+                    try {
+                        socket.close();
+                    } catch (IOException e) {
+                        System.err.println("Errore chiusura socket: " + e.getMessage());
+                    }
                 }
             }
         }
     }
-
-
 
     @FXML
     private void handleReplyEmail() {
@@ -523,22 +507,19 @@ public class ClientController {
 
 
     private void openComposeWindow(Email selectedEmail, String mode) {
-        // Show composition view
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
         emailTableView.setVisible(false);
         actionButtons.setVisible(false);
 
-        // Pre-fill fields based on mode
         switch (mode) {
             case "Reply":
                 toField.setText(selectedEmail.getSender());
                 subjectField.setText("Re: " + selectedEmail.getSubject());
-                bodyArea.setText("\n\n----- Original Message -----\n" + selectedEmail.getBody());
+                bodyArea.setText("\n\n----- Messaggio Originale -----\n" + selectedEmail.getBody());
                 break;
 
             case "Reply All":
-                // Get all recipients except current user
                 List<String> allRecipients = new ArrayList<>(selectedEmail.getRecipients());
                 allRecipients.add(selectedEmail.getSender());
                 allRecipients.remove(mailbox.getEmailAddress());
@@ -550,7 +531,7 @@ public class ClientController {
             case "Forward":
                 toField.setText("");
                 subjectField.setText("Fwd: " + selectedEmail.getSubject());
-                String forwardedContent = "\n\n----- Forwarded Message -----\n" +
+                String forwardedContent = "\n\n----- Messaggio inoltrato -----\n" +
                         "From: " + selectedEmail.getSender() + "\n" +
                         "Date: " + selectedEmail.getSentDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n" +
                         "Subject: " + selectedEmail.getSubject() + "\n" +
@@ -560,10 +541,8 @@ public class ClientController {
                 break;
         }
 
-        // Set up send button action
         sendButton.setOnAction(event -> handleSendEmail());
 
-        // Configure layout
         emailTableView.setVisible(true);
         detailOrComposeStack.getChildren().setAll(composeView);
         composeView.prefWidthProperty().bind(detailOrComposeStack.widthProperty());
@@ -572,49 +551,37 @@ public class ClientController {
 
     @FXML
     private void handleBackInCompose() {
-        // Verificare la visibilità della sezione di composizione
         if (isComposeViewVisible) {
-            // Nascondere la sezione di composizione
             composeView.setVisible(false);
             isComposeViewVisible = false;
         }
 
-        // Mostrare nuovamente la tabella delle email
         emailTableView.setVisible(true);
 
-        // Pulire il pannello a destra
         detailOrComposeStack.getChildren().clear();
 
-        // Aggiornare la tabella delle email
         refreshEmailTable();
     }
 
     @FXML
     private void returnToEmailListView() {
-        // Reset dello stato
         isComposeViewVisible = false;
 
-        // Slegare i binding delle dimensioni
         composeView.prefWidthProperty().unbind();
         composeView.prefHeightProperty().unbind();
 
-        // Nascondere le viste secondarie
         composeView.setVisible(false);
         emailDetailFlow.setVisible(false);
         actionButtons.setVisible(false);
 
-        // Mostrare la tabella delle email
         emailTableView.setVisible(true);
 
-        // Pulire il contenitore dei dettagli
         detailOrComposeStack.getChildren().clear();
 
-        // Reimpostare il layout
         emailTableView.setManaged(true);
         emailTableView.setMaxWidth(Double.MAX_VALUE);
         emailTableView.setMaxHeight(Double.MAX_VALUE);
 
-        // Aggiornare la vista
         refreshEmailTable();
         emailTableView.requestLayout();
         detailOrComposeStack.requestLayout();
@@ -658,7 +625,7 @@ public class ClientController {
             while (!Thread.currentThread().isInterrupted()) {
                 checkConnection();
                 try {
-                    Thread.sleep(5000); // Check connection every 5 seconds
+                    Thread.sleep(5000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }

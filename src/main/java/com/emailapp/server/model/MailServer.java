@@ -3,18 +3,17 @@ package com.emailapp.server.model;
 import com.emailapp.client.model.Email;
 import com.emailapp.server.controller.ServerController;
 import com.emailapp.util.EmailFileManager;
-
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class MailServer {
     private final Map<String, EmailAccount> accounts;
     private final ServerController serverController;
+    private final Object accountLock = new Object();
+    private final Object emailLock = new Object();
 
     public MailServer(ServerController serverController) {
         this.accounts = new HashMap<>();
@@ -26,32 +25,38 @@ public class MailServer {
     }
 
     public void sendEmail(Email email) {
-        String sender = email.getSender();
-        List<String> recipients = email.getRecipients();
+        synchronized (emailLock) {
+            String sender = email.getSender();
+            List<String> recipients = email.getRecipients();
 
-        createAccount(sender);
-        recipients.forEach(this::createAccount);
-
-        // Create independent copies only for recipients
-        for (String recipient : recipients) {
-            int uniqueEmailId = EmailFileManager.getNextId();
-
-            Email recipientCopy = createEmailCopy(email);
-            recipientCopy.setId(uniqueEmailId);
-            // Keep all recipients for Reply All functionality
-            recipientCopy.setRecipients(email.getRecipients());
-
-            accounts.get(recipient).addToInbox(recipientCopy);
-            try {
-                EmailFileManager.saveEmail(recipientCopy, recipient);
-            } catch (IOException e) {
-                serverController.logEvent("Error saving email for " + recipient + ": " + e.getMessage());
+            synchronized (accountLock) {
+                createAccount(sender);
+                recipients.forEach(this::createAccount);
             }
-        }
 
-        String recipientsStr = String.join(", ", recipients);
-        serverController.logEvent("Emails sent by " + sender + " to " + recipientsStr);
+            for (String recipient : recipients) {
+                int uniqueEmailId = EmailFileManager.getNextId();
+
+                Email recipientCopy = createEmailCopy(email);
+                recipientCopy.setId(uniqueEmailId);
+                recipientCopy.setRecipients(email.getRecipients());
+
+                synchronized (accountLock) {
+                    accounts.get(recipient).addToInbox(recipientCopy);
+                }
+
+                try {
+                    EmailFileManager.saveEmail(recipientCopy, recipient);
+                } catch (IOException e) {
+                    serverController.logEvent("Errore durante il salvataggio dell'email per " + recipient + ": " + e.getMessage());
+                }
+            }
+
+            String recipientsStr = String.join(", ", recipients);
+            serverController.logEvent("Email inviate da : " + sender + " a: " + recipientsStr);
+        }
     }
+
 
     private Email createEmailCopy(Email original) {
         Email copy = new Email();
@@ -66,30 +71,38 @@ public class MailServer {
     }
 
     public List<Email> getNewEmails(String recipient) {
-        createAccount(recipient);
-        return new ArrayList<>(accounts.get(recipient).getInbox());
+        synchronized (emailLock) {
+            synchronized (accountLock) {
+                createAccount(recipient);
+                return new ArrayList<>(accounts.get(recipient).getInbox());
+            }
+        }
     }
 
 
-    public synchronized boolean deleteEmail(int emailId, String requestingUser) {
-        EmailAccount account = accounts.get(requestingUser);
-        if (account == null) {
-            return false;
-        }
+    public boolean deleteEmail(int emailId, String requestingUser) {
+        synchronized (emailLock) {
+            synchronized (accountLock) {
+                EmailAccount account = accounts.get(requestingUser);
+                if (account == null) {
+                    return false;
+                }
 
-        boolean deletedFromInbox = account.getInbox().removeIf(email -> email.getId() == emailId);
-        boolean deletedFromSent = account.getSent().removeIf(email -> email.getId() == emailId);
+                boolean deletedFromInbox = account.getInbox().removeIf(email -> email.getId() == emailId);
+                boolean deletedFromSent = account.getSent().removeIf(email -> email.getId() == emailId);
 
-        if (deletedFromInbox || deletedFromSent) {
-            try {
-                EmailFileManager.deleteEmail(emailId, requestingUser);
-                return true;
-            } catch (IOException e) {
-                e.printStackTrace();
+                if (deletedFromInbox || deletedFromSent) {
+                    try {
+                        EmailFileManager.deleteEmail(emailId, requestingUser);
+                        return true;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        return false;
+                    }
+                }
                 return false;
             }
         }
-        return false;
     }
 
 }

@@ -63,7 +63,7 @@ public class SpamGenerator extends JFrame {
                 emailAddresses.add(line.trim());
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error loading email addresses: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Errore durante il caricamento degli indirizzi email: " + e.getMessage(), "Errore", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -79,7 +79,7 @@ public class SpamGenerator extends JFrame {
 
     private void startSpamming() {
         if (emailAddresses.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No email addresses loaded. Cannot start spamming.", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Nessun indirizzo email caricato. Impossibile iniziare a inviare spam.", "Errore", JOptionPane.ERROR_MESSAGE);
             return;
         }
         scheduler = Executors.newScheduledThreadPool(1);
@@ -105,7 +105,7 @@ public class SpamGenerator extends JFrame {
             NetworkUtils.sendObject(socket, spamEmail);
             String response = (String) NetworkUtils.receiveObject(socket);
         } catch (Exception e) {
-            System.err.println("Error sending spam email to " + recipient + ": " + e.getMessage());
+            System.err.println("Errore nell'invio dell'e-mail di spam a" + recipient + ": " + e.getMessage());
         }
     }
 

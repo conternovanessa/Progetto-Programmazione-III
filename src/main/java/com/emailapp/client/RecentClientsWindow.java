@@ -1,6 +1,5 @@
 package com.emailapp.client;
 
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -21,18 +20,18 @@ public class RecentClientsWindow {
 
     private void initialize() {
         stage = new Stage();
-        stage.setTitle("Recent Clients");
+        stage.setTitle("Client recenti: ");
 
         VBox root = new VBox(10);
         root.setPadding(new Insets(10));
 
-        Label titleLabel = new Label("Recent Email Clients");
+        Label titleLabel = new Label(" ");
         titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 
-        Button refreshButton = new Button("Refresh List");
+        Button refreshButton = new Button("Aggiorna la lista");
         refreshButton.setOnAction(e -> updateClientsList());
 
-        Button openSelectedButton = new Button("Open Selected Client");
+        Button openSelectedButton = new Button("Apri il client selezionato");
         openSelectedButton.setOnAction(e -> {
             String selectedEmail = clientsList.getSelectionModel().getSelectedItem();
             if (selectedEmail != null) {
@@ -40,7 +39,7 @@ public class RecentClientsWindow {
             }
         });
 
-        Button clearHistoryButton = new Button("Clear History");
+        Button clearHistoryButton = new Button("pulisci storia");
         clearHistoryButton.setOnAction(e -> {
             clientManager.clearHistory();
             updateClientsList();
@@ -51,7 +50,6 @@ public class RecentClientsWindow {
         Scene scene = new Scene(root, 300, 400);
         stage.setScene(scene);
 
-        // Aggiorna la lista quando la finestra viene mostrata
         stage.setOnShowing(e -> updateClientsList());
     }
 

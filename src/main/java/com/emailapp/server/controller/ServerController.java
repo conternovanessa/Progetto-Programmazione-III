@@ -29,7 +29,6 @@ public class ServerController {
     private boolean isRunning;
     private static final int DEFAULT_PORT = 5000;
 
-    // FXML controls
     @FXML private Label portLabel;
     @FXML private Button startStopButton;
     @FXML private TextArea logTextArea;
@@ -42,7 +41,7 @@ public class ServerController {
     @FXML
     private void initialize() {
         portLabel.setText(String.valueOf(DEFAULT_PORT));
-        startServer(DEFAULT_PORT); // Start the server automatically
+        startServer(DEFAULT_PORT);
         updateButtonState();
     }
 
@@ -69,9 +68,9 @@ public class ServerController {
             serverSocket = new ServerSocket(port);
             isRunning = true;
             executorService.submit(this::acceptConnections);
-            logEvent("Server started on port " + port);
+            logEvent("Server avviato sulla porta" + port);
         } catch (IOException e) {
-            logEvent("Failed to start server: " + e.getMessage());
+            logEvent("Impossibile avviare il server: " + e.getMessage());
         }
     }
 
@@ -82,7 +81,7 @@ public class ServerController {
                 executorService.submit(() -> handleClient(clientSocket));
             } catch (IOException e) {
                 if (isRunning) {
-                    logEvent("Error accepting client connection: " + e.getMessage());
+                    logEvent("Errore durante l'accettazione della connessione client: " + e.getMessage());
                 }
             }
         }
@@ -94,7 +93,7 @@ public class ServerController {
 
         try {
             inputStream = new ObjectInputStream(clientSocket.getInputStream());
-            clientSocket.setSoTimeout(30000); // 30 seconds timeout
+            clientSocket.setSoTimeout(30000);
 
             while (!clientSocket.isClosed()) {
                 try {
@@ -117,24 +116,24 @@ public class ServerController {
                             NetworkUtils.sendObject(clientSocket, "PONG");
                             break;
                         default:
-                            logEvent("Unknown command received: " + command);
+                            logEvent("Comando sconosciuto ricevuto: " + command);
                             break;
                     }
                 } catch (SocketException se) {
-                    if (se.getMessage().contains("Connection reset") ||
-                            se.getMessage().contains("Socket closed") ||
-                            se.getMessage().contains("Read timed out")) {
+                    if (se.getMessage().contains("Ripristino della connessione") ||
+                            se.getMessage().contains("Socket chiusa") ||
+                            se.getMessage().contains("Lettura scaduta")) {
                         break;
                     }
                     isAbnormalDisconnection = true;
-                    logEvent("Unexpected socket error: " + se.getMessage());
+                    logEvent("Errore socket imprevisto: " + se.getMessage());
                     break;
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
             if (isRunning && !(e instanceof EOFException)) {
                 isAbnormalDisconnection = true;
-                logEvent("Error in client connection: " + e.getMessage());
+                logEvent("Errore nella connessione del client: " + e.getMessage());
             }
         } finally {
             try {
@@ -144,12 +143,12 @@ public class ServerController {
                 if (!clientSocket.isClosed()) {
                     clientSocket.close();
                     if (isAbnormalDisconnection) {
-                        logEvent("Client connection closed after error");
+                        logEvent("Connessione client chiusa dopo un errore");
                     }
                 }
             } catch (IOException e) {
                 if (isRunning) {
-                    logEvent("Error while closing client resources: " + e.getMessage());
+                    logEvent("Errore durante la chiusura delle risorse client:" + e.getMessage());
                 }
             }
         }
@@ -164,7 +163,7 @@ public class ServerController {
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
-                    logEvent("Error closing socket in handleSendEmail: " + e.getMessage());
+                    logEvent("Errore durante la chiusura del socket in handleSendEmail: " + e.getMessage());
                 }
             }
         }
@@ -180,7 +179,7 @@ public class ServerController {
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
-                    logEvent("Error closing socket in handleFetchNewEmails: " + e.getMessage());
+                    logEvent("Errore durante la chiusura del socket in handleFetchNewEmails: " + e.getMessage());
                 }
             }
         }
@@ -194,9 +193,9 @@ public class ServerController {
         NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
 
         if (deleted) {
-            logEvent("Email " + emailId + " deleted by user " + requestingUser);
+            logEvent("Email " + emailId + " eliminata da: " + requestingUser);
         } else {
-            logEvent("Failed to delete email " + emailId + " for user " + requestingUser);
+            logEvent("Eliminazione fallita per Email: " + emailId + " dell'utente: " + requestingUser);
         }
     }
 
@@ -233,7 +232,7 @@ public class ServerController {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                logEvent("Error closing server socket: " + e.getMessage());
+                logEvent("Errore durante la chiusura del socket del server: " + e.getMessage());
             }
         }
         executorService.shutdownNow();
