@@ -4,10 +4,11 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.progetto</groupId>
-    <artifactId>Nuovo_progetto</artifactId>
+
+    <groupId>com</groupId>
+    <artifactId>emailapp</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>Nuovo progetto</name>
+    <name>emailapp</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -135,6 +136,7 @@
                         <configuration>
                             <mainClass>com.progetto.nuovo_progetto/com.progetto.nuovo_progetto.HelloApplication
                             </mainClass>
+                            <mainClass>com.emailapp/com.emailapp.HelloApplication</mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>

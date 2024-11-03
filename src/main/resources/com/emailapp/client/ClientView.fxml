@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.text.TextFlow?>
+
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.emailapp.client.controller.ClientController">
+
+    <BorderPane>
+        <top>
+            <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 10;">
+                <Label fx:id="emailAddressLabel" />
+                <Label fx:id="connectionStatusLabel" />
+                <Button text="Compose" onAction="#handleComposeEmail" />
+            </HBox>
+        </top>
+
+        <center>
+            <SplitPane dividerPositions="0.4">
+                <TableView fx:id="emailTableView" onMouseClicked="#handleEmailSelection">
+                    <columns>
+                        <TableColumn fx:id="senderColumn" text="Sender" />
+                        <TableColumn fx:id="subjectColumn" text="Subject" />
+                        <TableColumn fx:id="dateColumn" text="Date" />
+                    </columns>
+                </TableView>
+                <StackPane fx:id="detailOrComposeStack">
+                    <ScrollPane fitToWidth="true" fitToHeight="true">
+                        <TextFlow fx:id="emailDetailFlow" visible="false">
+                            <padding>
+                                <Insets top="20" right="20" bottom="20" left="20"/>
+                            </padding>
+                            <TextArea fx:id="emailDetailTextArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS"/>
+                        </TextFlow>
+                    </ScrollPane>
+                    <VBox fx:id="composeView" visible="false" spacing="10">
+                        <padding>
+                            <Insets top="20" right="20" bottom="20" left="20"/>
+                        </padding>
+                        <GridPane vgap="10" hgap="10">
+                            <columnConstraints>
+                                <ColumnConstraints hgrow="NEVER" />
+                                <ColumnConstraints hgrow="ALWAYS" />
+                            </columnConstraints>
+                            <Label text="To:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                            <TextField fx:id="toField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                            <Label text="Subject:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                            <TextField fx:id="subjectField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                        </GridPane>
+                        <TextArea fx:id="bodyArea" VBox.vgrow="ALWAYS" promptText="Compose your email here..." />
+                        <HBox spacing="10" alignment="CENTER_RIGHT">
+                            <Button fx:id="sendButton" text="Send" onAction="#handleSendEmail" />
+                            <Button text="Back" onAction="#handleBackInCompose" />
+                        </HBox>
+                    </VBox>
+                </StackPane>
+            </SplitPane>
+        </center>
+
+        <bottom>
+            <HBox fx:id="actionButtons" spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 10;" visible="false">
+                <Button text="Reply" onAction="#handleReplyEmail" />
+                <Button text="Reply All" onAction="#handleReplyAllEmail" />
+                <Button text="Forward" onAction="#handleForwardEmail" />
+                <Button text="Delete" onAction="#handleDeleteEmail" />
+                <Button text="Back" onAction="#handleBackButton" />
+            </HBox>
+        </bottom>
+    </BorderPane>
+</VBox>
