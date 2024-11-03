@@ -63,7 +63,7 @@ Domande possibili con risposte su codice:
     // Fornisce operazioni atomiche sul contatore
     // Non richiede lock esplicito
     
------------ **_Teria_** -----------
+----------- **_Teoria_** -----------
 Tipi di lock utilizzati:                                            Ogni tipo di lock serve uno scopo specifico:
 
 Lock su oggetti dedicati (lock, emailOperationLock)                 Lock dedicati: proteggono operazioni specifiche
