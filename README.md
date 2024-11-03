@@ -3,7 +3,8 @@ La run viene fatta partire nella classe StartApp che si trova al di fuori di tut
 Quando parte di aprono 5 finestre: 3 client, 1 Server con i log relativi alle azioni di nuove mail o eliminazione una finestra che permette con un tasto di aprire dei client se per sbaglio vengono chiusi. 
 Nella directory spam c'è una cosa in più: è una classe che con un tasto scrive da 1 a 4 mail in contemporenea a 1 client destinatario (per far vedere la mutua esclusione).
 Domande possibili con risposte su codice:
-1. Dove e come viene implementata la mutua esclusione?
+# 1. Dove e come viene implementata la mutua esclusione?
+```
    La mutua esclusione viene implementata in diverse posioni di codice nel progetto seguendo determinati meccanismi: 
    ---- **ClientController.java** ----
    private final Object lock = new Object();
@@ -63,28 +64,29 @@ Domande possibili con risposte su codice:
     // Fornisce operazioni atomiche sul contatore
     // Non richiede lock esplicito
     
------------ **_Teoria_** -----------
-Tipi di lock utilizzati:                                            Ogni tipo di lock serve uno scopo specifico:
+   ----------- **_Teoria_** -----------
+   Tipi di lock utilizzati:                                            Ogni tipo di lock serve uno scopo specifico:
+   
+   Lock su oggetti dedicati (lock, emailOperationLock)                 Lock dedicati: proteggono operazioni specifiche
+   Lock gerarchici (emailLock, accountLock)                            Lock gerarchici: prevengono deadlock
+   Lock impliciti su metodi (synchronized)                             Lock su metodi: proteggono l'intero scope del metodo
+   Lock atomici (AtomicInteger)                                        Lock atomici: garantiscono atomicità delle operazioni
+   
+   I lock in informatica sono meccanismi di sincronizzazione che servono a regolare l'accesso alle risorse condivise tra più thread o processi. Ecco le caratteristiche principali:
+   - Un lock è una variabile di sincronizzazione che può essere in due stati: libero o occupato
+   - Solo un thread alla volta può possedere il lock
+   - Gli altri thread che richiedono il lock vengono messi in attesa
 
-Lock su oggetti dedicati (lock, emailOperationLock)                 Lock dedicati: proteggono operazioni specifiche
-Lock gerarchici (emailLock, accountLock)                            Lock gerarchici: prevengono deadlock
-Lock impliciti su metodi (synchronized)                             Lock su metodi: proteggono l'intero scope del metodo
-Lock atomici (AtomicInteger)                                        Lock atomici: garantiscono atomicità delle operazioni
-
-I lock in informatica sono meccanismi di sincronizzazione che servono a regolare l'accesso alle risorse condivise tra più thread o processi. Ecco le caratteristiche principali:
-- Un lock è una variabile di sincronizzazione che può essere in due stati: libero o occupato
-- Solo un thread alla volta può possedere il lock
-- Gli altri thread che richiedono il lock vengono messi in attesa
-
-Scopi principali:                  Caratteristiche importanti:
-
-Mutua esclusione                   - Atomicità delle operazioni
-Sincronizzazione                   - Visibilità delle modifiche tra thread
-Protezione dati condivisi          - Ordine di acquisizione per evitare deadlock
-Prevenzione race condition         - Granularità del lock
+         Scopi principali:                  Caratteristiche importanti:
+         
+         Mutua esclusione                   - Atomicità delle operazioni
+         Sincronizzazione                   - Visibilità delle modifiche tra thread
+         Protezione dati condivisi          - Ordine di acquisizione per evitare deadlock
+         Prevenzione race condition         - Granularità del lock
 I lock sono fondamentali nella programmazione concorrente per garantire la correttezza e la consistenza delle operazioni su risorse condivise.
-
-2. Come avviene la gestione delle mail quando il Server cade?
+```
+# 2. Come avviene la gestione delle mail quando il Server cade?
+```
    La gestione delle mail durante la caduta del server viene gestita principalmente attraverso due meccanismi:
    a. Persistenza locale delle email in ClientController:                    ---- **ClientController.java**  ----
      private void loadEmailsFromDisk() {
@@ -149,8 +151,9 @@ Il sistema funziona così:
     - Il client si riconnette automaticamente
     - Le operazioni di invio tornano disponibili
     - L'interfaccia si aggiorna mostrando lo stato connesso
-
-3.Come avvengono gli aggiornamenti in casella in entrata?
+```
+# 3.Come avvengono gli aggiornamenti in casella in entrata?
+```
   ---- **ClientController.java**  ----
   private void setupAutoRefresh() {
     autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
@@ -217,8 +220,9 @@ Il processo di aggiornamento funziona così:                    Il sistema garan
 3. Le nuove email vengono aggiunte alla mailbox locale         - Notifiche immediate
 4. L'interfaccia utente viene aggiornata                       - Persistenza dei dati
 5. L'utente riceve una notifica per le nuove email             - Consistenza della visualizzazione
-
-4. Come viene gestito l'errore di sintassi nel progetto?
+```
+# 4. Come viene gestito l'errore di sintassi nel progetto?
+```
    ---- **ClientController.java** ----
    private synchronized void handleSendEmail() {
         if (!isConnected()) {
@@ -265,8 +269,9 @@ L'utente riceve feedback immediato attraverso:
 - Alert di errore con messaggio specifico
 - Mantenimento del testo inserito per correzioni
 - Possibilità di ritentare l'invio
-
-5. REPLY / REPLY ALL:
+```
+# 5. REPLY / REPLY ALL:
+```
      ---- **ClientController.java** ----
      @FXML
       private void handleReplyEmail() {
@@ -371,8 +376,9 @@ La reply viene trattata come una nuova email dal server, ma con riferimenti all'
 La differenza chiave tra Reply e Reply All sta nella gestione dei destinatari:
   Reply: invia solo al mittente originale
   Reply All: invia a tutti i destinatari originali + il mittente originale, escludendo l'utente corrente
-
-7. FORWARD:
+```
+# 6. FORWARD:
+```
      ---- **ClientController.java** ----
      @FXML
      private void handleForwardEmail() {
@@ -402,8 +408,9 @@ Le caratteristiche chiave del Forward sono:
 2. Oggetto prefissato con "Fwd:"
 3. Inclusione dei metadati completi dell'email originale (mittente, data, oggetto, destinatari)
 4. Corpo del messaggio originale incluso con formattazione specifica
-
-9. DELETE:
+```
+# 7. DELETE:
+```
     ---- **ClientController.java** ----
     @FXML
    private void handleDeleteEmail() {
@@ -467,7 +474,6 @@ Le caratteristiche chiave del Forward sono:
    public static boolean deleteEmail(int emailId, String userEmail) throws IOException {
     Path userDir = Paths.get(BASE_DIR, userEmail);
     Path emailFile = userDir.resolve("Email_" + emailId + ".txt");
-
     if (Files.exists(emailFile)) {
         try {
             Files.delete(emailFile);
@@ -506,8 +512,9 @@ Il flusso di eliminazione è:
   3. Server rimuove l'email dalle liste in memoria (inbox e sent)
   4. Server elimina il file fisico dell'email
   5. Client aggiorna la sua vista rimuovendo l'email dalla tabella
-     
-11. Come avviene la comunicazione tra i Client e il Server?
+```
+# 9. Come avviene la comunicazione tra i Client e il Server?
+```
     La comunicazione tra Client e Server avviene attraverso socket TCP/IP seguendo questo flusso:
     ---- **ClientController.java** ----
     // Invio email
@@ -607,8 +614,9 @@ Le socket permettono:
 - Trasmissione affidabile dei dati
 - Connessioni TCP/IP
 - Gestione di più client contemporaneamente
-    
-13. Come sono le Socket permanenti o no?
+```
+# 10. Come sono le Socket permanenti o no?
+```
     Le socket in questo progetto non sono permanenti ma vengono create e chiuse per ogni singola operazione. Ecco il codice rilevante:
     ---- **ClientController.java** ----
     // Esempio di socket temporanea per invio email
@@ -650,8 +658,9 @@ Questo approccio è stato scelto per:
 - Minor consumo di risorse
 - Migliore gestione degli errori di rete
 - Nessuna necessità di mantenere connessioni persistenti
-    
-15. Come viene gestito il file di log del Server?
+```
+# 11. Come viene gestito il file di log del Server?
+```
     Il file di log del Server viene gestito attraverso la TextArea nell'interfaccia grafica. Ecco il codice rilevante:
     ---- **ServerController.java** ----
     @FXML private TextArea logTextArea;
@@ -681,9 +690,9 @@ Questo approccio è stato scelto per:
   - Tracciamento degli errori
   - Visualizzazione dello stato del server
   - Debug delle operazioni client/server
-
-    
-17. Come sono legate le viste e i model?
+``` 
+# 12. Come sono legate le viste e i model?
+```
     Le viste e i model sono legati attraverso il pattern MVC (Model-View-Controller) utilizzando il data binding di JavaFX. Ecco i principali collegamenti:
     ---- **ClientController.java** ----
     // Collegamento TableView con il model Mailbox
@@ -717,8 +726,9 @@ Questo approccio è stato scelto per:
     }
 **!!!!**  _Non c'è una comunicazione diretta tra viste e model. La comunicazione avviene sempre attraverso il Controller che funge da intermediario, rispettando il pattern MVC._  **!!!!**
     Vista → Controller → Model                             Model → Controller → Vista:
-
-19. Sono state usate delle properties?
+```
+# 13. Sono state usate delle properties?
+```
     Sì, nel progetto sono state utilizzate delle properties di JavaFX! 
     ---- **ClientController.java** ----
       // Property per stato connessione
@@ -743,8 +753,9 @@ Le properties sono utilizzate principalmente per:
 - Layout UI (dimensioni)
 - Dati del modello (email)
 - Collezioni osservabili (mailbox)
-
-21. Sono stati usati degli observable list?
+```
+# 14. Sono stati usati degli observable list?
+```
     Sì! Nel progetto sono state utilizzate diverse ObservableList, ecco i dettagli:
     ---- **Mailbox.java** ----
     // Liste osservabili per le email
@@ -783,3 +794,4 @@ Le properties sono utilizzate principalmente per:
     - Aggiornamenti UI in tempo reale
     - Sincronizzazione automatica tra model e view
     - Gestione efficiente delle collezioni di dati
+```
