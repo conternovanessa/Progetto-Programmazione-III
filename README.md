@@ -72,7 +72,8 @@ Domande possibili con risposte su codice:
    Lock impliciti su metodi (synchronized)                             Lock su metodi: proteggono l'intero scope del metodo
    Lock atomici (AtomicInteger)                                        Lock atomici: garantiscono atomicità delle operazioni
    
-   I lock in informatica sono meccanismi di sincronizzazione che servono a regolare l'accesso alle risorse condivise tra più thread o processi.
+   I lock in informatica sono meccanismi di sincronizzazione che servono a regolare l'accesso alle risorse condivise tra
+più thread o processi.
 Ecco le caratteristiche principali:
    - Un lock è una variabile di sincronizzazione che può essere in due stati: libero o occupato
    - Solo un thread alla volta può possedere il lock
@@ -84,7 +85,8 @@ Ecco le caratteristiche principali:
          Sincronizzazione                   - Visibilità delle modifiche tra thread
          Protezione dati condivisi          - Ordine di acquisizione per evitare deadlock
          Prevenzione race condition         - Granularità del lock
-I lock sono fondamentali nella programmazione concorrente per garantire la correttezza e la consistenza delle operazioni su risorse condivise.
+I lock sono fondamentali nella programmazione concorrente per garantire la correttezza e la consistenza delle operazioni
+su risorse condivise.
 ```
 # 2. Come avviene la gestione delle mail quando il Server cade?
 ```
@@ -265,7 +267,8 @@ Il processo di aggiornamento funziona così:                    Il sistema garan
            ...
      }
    }
-   In questi due casi viene prima controllato in ClientController.java se il "dominio" @progetto.com sia giusto e poi se l'effettivo account esite:
+   In questi due casi viene prima controllato in ClientController.java se il "dominio" @progetto.com sia giusto e poi se
+l'effettivo account esite:
 nel nostro caso filippoditto, fabiodelia, vanessaconterno.
 L'utente riceve feedback immediato attraverso:
 - Alert di errore con messaggio specifico
@@ -306,7 +309,8 @@ L'utente riceve feedback immediato attraverso:
         // ... gestione dell'invio
     }
    }
-La reply viene trattata come una nuova email dal server, ma con riferimenti all'email originale (oggetto con "Re:", citazione del messaggio originale).
+La reply viene trattata come una nuova email dal server, ma con riferimenti all'email originale (oggetto con "Re:",
+citazione del messaggio originale).
 Il flusso è:
 1. Client: Utente seleziona email e clicca reply
 2. Client: Prepara nuova email con campi pre-compilati
@@ -620,7 +624,8 @@ Le socket permettono:
 ```
 # 10. Come sono le Socket permanenti o no?
 ```
-    Le socket in questo progetto non sono permanenti ma vengono create e chiuse per ogni singola operazione. Ecco il codice rilevante:
+    Le socket in questo progetto non sono permanenti ma vengono create e chiuse per ogni singola operazione.
+Ecco il codice rilevante:
     ---- **ClientController.java** ----
     // Esempio di socket temporanea per invio email
     private synchronized boolean sendEmail(Email email) {
@@ -664,7 +669,8 @@ Questo approccio è stato scelto per:
 ```
 # 11. Come viene gestito il file di log del Server?
 ```
-    Il file di log del Server viene gestito attraverso la TextArea nell'interfaccia grafica. Ecco il codice rilevante:
+    Il file di log del Server viene gestito attraverso la TextArea nell'interfaccia grafica.
+    Ecco il codice rilevante:
     ---- **ServerController.java** ----
     @FXML private TextArea logTextArea;
 
@@ -696,7 +702,8 @@ Questo approccio è stato scelto per:
 ``` 
 # 12. Come sono legate le viste e i model?
 ```
-    Le viste e i model sono legati attraverso il pattern MVC (Model-View-Controller) utilizzando il data binding di JavaFX. Ecco i principali collegamenti:
+    Le viste e i model sono legati attraverso il pattern MVC (Model-View-Controller) utilizzando il data binding di JavaFX.
+Ecco i principali collegamenti:
     ---- **ClientController.java** ----
     // Collegamento TableView con il model Mailbox
     @FXML private TableView<Email> emailTableView;
@@ -727,7 +734,8 @@ Questo approccio è stato scelto per:
         allEmails.addAll(sentEmails);
         return allEmails;
     }
-**!!!!**  _Non c'è una comunicazione diretta tra viste e model. La comunicazione avviene sempre attraverso il Controller che funge da intermediario,
+**!!!!**  _Non c'è una comunicazione diretta tra viste e model. La comunicazione avviene sempre
+attraverso il Controller che funge da intermediario,
 rispettando il pattern MVC._  **!!!!**
     Vista → Controller → Model                             Model → Controller → Vista:
 ```
