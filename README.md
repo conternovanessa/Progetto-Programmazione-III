@@ -72,7 +72,8 @@ Domande possibili con risposte su codice:
    Lock impliciti su metodi (synchronized)                             Lock su metodi: proteggono l'intero scope del metodo
    Lock atomici (AtomicInteger)                                        Lock atomici: garantiscono atomicità delle operazioni
    
-   I lock in informatica sono meccanismi di sincronizzazione che servono a regolare l'accesso alle risorse condivise tra più thread o processi. Ecco le caratteristiche principali:
+   I lock in informatica sono meccanismi di sincronizzazione che servono a regolare l'accesso alle risorse condivise tra più thread o processi.
+Ecco le caratteristiche principali:
    - Un lock è una variabile di sincronizzazione che può essere in due stati: libero o occupato
    - Solo un thread alla volta può possedere il lock
    - Gli altri thread che richiedono il lock vengono messi in attesa
@@ -264,7 +265,8 @@ Il processo di aggiornamento funziona così:                    Il sistema garan
            ...
      }
    }
-   In questi due casi viene prima controllato in ClientController.java se il "dominio" @progetto.com sia giusto e poi se l'effettivo account esite: nel nostro caso filippoditto, fabiodelia, vanessaconterno.
+   In questi due casi viene prima controllato in ClientController.java se il "dominio" @progetto.com sia giusto e poi se l'effettivo account esite:
+nel nostro caso filippoditto, fabiodelia, vanessaconterno.
 L'utente riceve feedback immediato attraverso:
 - Alert di errore con messaggio specifico
 - Mantenimento del testo inserito per correzioni
@@ -304,7 +306,8 @@ L'utente riceve feedback immediato attraverso:
         // ... gestione dell'invio
     }
    }
-La reply viene trattata come una nuova email dal server, ma con riferimenti all'email originale (oggetto con "Re:", citazione del messaggio originale). Il flusso è:
+La reply viene trattata come una nuova email dal server, ma con riferimenti all'email originale (oggetto con "Re:", citazione del messaggio originale).
+Il flusso è:
 1. Client: Utente seleziona email e clicca reply
 2. Client: Prepara nuova email con campi pre-compilati
 3. Client: Invia al server come normale email
@@ -724,7 +727,8 @@ Questo approccio è stato scelto per:
         allEmails.addAll(sentEmails);
         return allEmails;
     }
-**!!!!**  _Non c'è una comunicazione diretta tra viste e model. La comunicazione avviene sempre attraverso il Controller che funge da intermediario, rispettando il pattern MVC._  **!!!!**
+**!!!!**  _Non c'è una comunicazione diretta tra viste e model. La comunicazione avviene sempre attraverso il Controller che funge da intermediario,
+rispettando il pattern MVC._  **!!!!**
     Vista → Controller → Model                             Model → Controller → Vista:
 ```
 # 13. Sono state usate delle properties?
