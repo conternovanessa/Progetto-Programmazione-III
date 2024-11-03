@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
 public class SpamGenerator extends JFrame {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
-    private static final int DELAY_BETWEEN_EMAILS = 500; // 500ms di ritardo tra le email
-    private static final int CONNECTION_TIMEOUT = 5000; // 5 secondi timeout
+    private static final int DELAY_BETWEEN_EMAILS = 500;
+    private static final int CONNECTION_TIMEOUT = 5000;
 
     private static final List<String> SPAM_SUBJECTS = Arrays.asList(
             "Offerta imperdibile!",
@@ -65,7 +65,6 @@ public class SpamGenerator extends JFrame {
 
         loadEmailAddresses();
 
-        // Aggiungi un handler per la chiusura della finestra
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -116,7 +115,6 @@ public class SpamGenerator extends JFrame {
             return;
         }
 
-        // Inizializza la connessione
         try {
             currentSocket = new Socket(SERVER_ADDRESS, SERVER_PORT);
             currentSocket.setSoTimeout(CONNECTION_TIMEOUT);
@@ -139,7 +137,6 @@ public class SpamGenerator extends JFrame {
             }
         }
 
-        // Chiudi la connessione
         if (currentSocket != null && !currentSocket.isClosed()) {
             try {
                 currentSocket.close();
@@ -153,15 +150,13 @@ public class SpamGenerator extends JFrame {
     private void sendMultipleSpamToOneClient() {
         if (!isRunning || currentSocket == null || currentSocket.isClosed()) return;
 
-        // Scegli un destinatario casuale
         String recipient = emailAddresses.get(random.nextInt(emailAddresses.size()));
 
-        // Invia multiple email da mittenti diversi
+
         List<String> usedSenders = new ArrayList<>();
-        int numberOfEmails = 2 + random.nextInt(3); // Invia da 2 a 4 email
+        int numberOfEmails = 2 + random.nextInt(3);
 
         for (int i = 0; i < numberOfEmails && isRunning; i++) {
-            // Scegli un mittente non ancora utilizzato
             String sender;
             do {
                 sender = SPAM_SENDERS.get(random.nextInt(SPAM_SENDERS.size()));
@@ -170,7 +165,6 @@ public class SpamGenerator extends JFrame {
 
             sendSpamEmail(recipient, sender);
 
-            // Attendi un po' tra un invio e l'altro
             try {
                 Thread.sleep(DELAY_BETWEEN_EMAILS);
             } catch (InterruptedException e) {
