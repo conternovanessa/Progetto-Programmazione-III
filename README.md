@@ -4,7 +4,7 @@ Quando parte di aprono 5 finestre: 3 client, 1 Server con i log relativi alle az
 Nella directory spam c'è una cosa in più: è una classe che con un tasto scrive da 1 a 4 mail in contemporenea a 1 client destinatario (per far vedere la mutua esclusione).
 Domande possibili con risposte su codice:
 1. Dove e come viene implementata la mutua esclusione?
-   La mutua esclusione viene implementata in diverse posioni di codice nel progetto seguendo determinati meccanismi:
+   La mutua esclusione viene implementata in diverse posioni di codice nel progetto seguendo determinati meccanismi: 
    ---- **ClientController.java** ----
    private final Object lock = new Object();
    private final Object emailOperationLock = new Object();
