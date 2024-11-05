@@ -55,19 +55,15 @@ public class MailServer {
         synchronized (emailLock) {
             String sender = email.getSender();
             List<String> recipients = email.getRecipients();
-
             synchronized (accountLock) {
                 createAccount(sender);
                 recipients.forEach(this::createAccount);
             }
-
             for (String recipient : recipients) {
                 int uniqueEmailId = EmailFileManager.getNextId();
-
                 Email recipientCopy = createEmailCopy(email);
                 recipientCopy.setId(uniqueEmailId);
                 recipientCopy.setRecipients(email.getRecipients());
-
                 synchronized (accountLock) {
                     accounts.get(recipient).addToInbox(recipientCopy);
                 }
@@ -78,9 +74,8 @@ public class MailServer {
                     serverController.logEvent("Errore durante il salvataggio dell'email per " + recipient + ": " + e.getMessage());
                 }
             }
-
             String recipientsStr = String.join(", ", recipients);
-            serverController.logEvent(" 📧 Email inviata da : " + sender + " a: " + recipientsStr);
+            serverController.logEvent(" 📧 Email inviata da : " + sender + " a: " + recipientsStr + "\n Oggetto: " + email.getSubject());
         }
     }
 
