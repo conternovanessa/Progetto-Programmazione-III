@@ -18,7 +18,7 @@ public class MailServer {
     public MailServer(ServerController serverController) {
         this.accounts = new HashMap<>();
         this.serverController = serverController;
-        loadExistingEmails(); // Aggiungi questa chiamata
+        loadExistingEmails();
     }
 
     public void loadExistingEmails() {
