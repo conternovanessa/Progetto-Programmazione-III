@@ -118,8 +118,6 @@ public class EmailFileManager {
         if (Files.exists(emailFile)) {
             try {
                 Files.delete(emailFile);
-                // Se l'email è stata inviata a più destinatari, elimina il file anche dalle loro directory
-                deleteEmailFromAllRecipients(emailId);
                 return true;
             } catch (IOException e) {
                 System.err.println("Errore durante l'eliminazione del file: " + e.getMessage());
@@ -128,32 +126,6 @@ public class EmailFileManager {
         }
         return false;
     }
-
-    private static void deleteEmailFromAllRecipients(int emailId) {
-        try {
-            Path baseDir = Paths.get(BASE_DIR);
-            if (Files.exists(baseDir)) {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(baseDir)) {
-                    for (Path userDir : stream) {
-                        if (Files.isDirectory(userDir)) {
-                            Path emailFile = userDir.resolve("Email_" + emailId + ".txt");
-                            if (Files.exists(emailFile)) {
-                                try {
-                                    Files.delete(emailFile);
-                                } catch (IOException e) {
-                                    System.err.println("Errore durante l'eliminazione del file per l'utente " +
-                                            userDir.getFileName() + ": " + e.getMessage());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Errore durante l'eliminazione delle email per tutti i destinatari: " + e.getMessage());
-        }
-    }
-
     public static void markEmailAsRead(int emailId, String userEmail) throws IOException {
         Path userDir = Paths.get(BASE_DIR, userEmail);
         Path filePath = userDir.resolve("Email_" + emailId + ".txt");

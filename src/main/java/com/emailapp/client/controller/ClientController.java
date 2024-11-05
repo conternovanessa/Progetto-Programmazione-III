@@ -494,25 +494,53 @@ public class ClientController {
 
     private void deleteEmail(Email email) {
         executorService.submit(() -> {
+            Socket socket = null;
             try {
-                if (EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress())) {
+                socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+                NetworkUtils.sendObject(socket, "DELETE_EMAIL");
+                NetworkUtils.sendObject(socket, email.getId());
+                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+
+                Object response = NetworkUtils.receiveObject(socket);
+                String responseStr = response != null ? response.toString() : null;
+
+                if ("OK".equals(responseStr)) {
+                    // Delete from local file system
+                    EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
+
+                    // Update UI on JavaFX thread
                     Platform.runLater(() -> {
+                        // Remove from mailbox
                         mailbox.removeEmail(email);
+                        // Add to deleted IDs set
                         deletedEmailIds.add(email.getId());
-                        refreshEmailTable();
+                        // Clear selection
+                        emailTableView.getSelectionModel().clearSelection();
+                        // Force refresh table
+                        emailTableView.refresh();
+                        // Return to list view
                         returnToEmailListView();
+                        // Show confirmation
                         showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
                     });
                 } else {
                     Platform.runLater(() -> {
-                        showErrorAlert("Errore", "Impossibile eliminare l'email.");
+                        showErrorAlert("Errore", "Impossibile eliminare l'email dal server.");
                     });
                 }
-            } catch (IOException e) {
+            } catch (IOException | ClassNotFoundException e) {
                 Platform.runLater(() -> {
                     showErrorAlert("Errore", "Si è verificato un errore durante l'eliminazione dell'email: " + e.getMessage());
                 });
                 e.printStackTrace();
+            } finally {
+                if (socket != null && !socket.isClosed()) {
+                    try {
+                        socket.close();
+                    } catch (IOException e) {
+                        System.err.println("Errore chiusura socket: " + e.getMessage());
+                    }
+                }
             }
         });
     }

@@ -192,13 +192,13 @@ public class ServerController {
         boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
         NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
 
+        // Enhanced logging messages with emojis for better visibility
         if (deleted) {
-            logEvent("Email " + emailId + " eliminata da: " + requestingUser);
+            logEvent("✅ Email eliminata con successo - ID: " + emailId + " | Utente: " + requestingUser);
         } else {
-            logEvent("Eliminazione fallita per Email: " + emailId + " dell'utente: " + requestingUser);
+            logEvent("❌ Eliminazione email fallita - ID: " + emailId + " | Utente: " + requestingUser);
         }
     }
-
 
     @FXML
     public void handleStopServer() {

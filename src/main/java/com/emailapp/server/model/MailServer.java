@@ -85,6 +85,7 @@ public class MailServer {
             synchronized (accountLock) {
                 EmailAccount account = accounts.get(requestingUser);
                 if (account == null) {
+                    serverController.logEvent("⚠️ Tentativo di eliminazione fallito: account non trovato per " + requestingUser);
                     return false;
                 }
 
@@ -94,12 +95,15 @@ public class MailServer {
                 if (deletedFromInbox || deletedFromSent) {
                     try {
                         EmailFileManager.deleteEmail(emailId, requestingUser);
+                        serverController.logEvent("📧 Email " + emailId + " rimossa dal sistema per l'utente " + requestingUser);
                         return true;
                     } catch (IOException e) {
+                        serverController.logEvent("❌ Errore durante l'eliminazione del file email " + emailId + ": " + e.getMessage());
                         e.printStackTrace();
                         return false;
                     }
                 }
+                serverController.logEvent("⚠️ Email " + emailId + " non trovata per l'utente " + requestingUser);
                 return false;
             }
         }
