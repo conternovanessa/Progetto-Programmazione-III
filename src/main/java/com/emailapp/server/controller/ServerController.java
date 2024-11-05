@@ -67,8 +67,9 @@ public class ServerController {
         try {
             serverSocket = new ServerSocket(port);
             isRunning = true;
+            mailServer.loadExistingEmails(); // Direct call on mailServer instance
             executorService.submit(this::acceptConnections);
-            logEvent("Server avviato sulla porta" + port);
+            logEvent("Server avviato sulla porta " + port);
         } catch (IOException e) {
             logEvent("Impossibile avviare il server: " + e.getMessage());
         }

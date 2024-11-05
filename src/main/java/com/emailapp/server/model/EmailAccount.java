@@ -26,4 +26,8 @@ public class EmailAccount {
     public void addToInbox(Email email) {
         inbox.add(email);
     }
+
+    public void addToSent(Email email) {
+        sent.add(email);
+    }
 }

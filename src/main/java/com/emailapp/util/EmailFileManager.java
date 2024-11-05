@@ -141,4 +141,15 @@ public class EmailFileManager {
             Files.write(filePath, lines);
         }
     }
+    public static List<String> loadValidEmails() throws IOException {
+        List<String> emails = new ArrayList<>();
+        try (InputStream inputStream = EmailFileManager.class.getResourceAsStream("/emails.txt");
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                emails.add(line.trim());
+            }
+        }
+        return emails;
+    }
 }

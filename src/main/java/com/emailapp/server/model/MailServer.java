@@ -18,8 +18,35 @@ public class MailServer {
     public MailServer(ServerController serverController) {
         this.accounts = new HashMap<>();
         this.serverController = serverController;
+        loadExistingEmails(); // Aggiungi questa chiamata
     }
 
+    public void loadExistingEmails() {
+        try {
+            List<String> emailAddresses = EmailFileManager.loadValidEmails();
+
+            for (String emailAddress : emailAddresses) {
+                createAccount(emailAddress);
+
+                try {
+                    List<Email> emails = EmailFileManager.loadEmails(emailAddress);
+                    EmailAccount account = accounts.get(emailAddress);
+
+                    for (Email email : emails) {
+                        if (email.getSender().equals(emailAddress)) {
+                            account.addToSent(email);
+                        } else {
+                            account.addToInbox(email);
+                        }
+                    }
+                } catch (IOException e) {
+                    serverController.logEvent("Errore nel caricamento delle email per " + emailAddress + ": " + e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            serverController.logEvent("Errore nel caricamento degli indirizzi email validi: " + e.getMessage());
+        }
+    }
     public void createAccount(String emailAddress) {
         accounts.putIfAbsent(emailAddress, new EmailAccount(emailAddress));
     }
