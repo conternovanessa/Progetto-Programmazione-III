@@ -505,22 +505,14 @@ public class ClientController {
                 String responseStr = response != null ? response.toString() : null;
 
                 if ("OK".equals(responseStr)) {
-                    // Delete from local file system
                     EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
 
-                    // Update UI on JavaFX thread
                     Platform.runLater(() -> {
-                        // Remove from mailbox
                         mailbox.removeEmail(email);
-                        // Add to deleted IDs set
                         deletedEmailIds.add(email.getId());
-                        // Clear selection
                         emailTableView.getSelectionModel().clearSelection();
-                        // Force refresh table
                         emailTableView.refresh();
-                        // Return to list view
                         returnToEmailListView();
-                        // Show confirmation
                         showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
                     });
                 } else {
@@ -543,31 +535,6 @@ public class ClientController {
                 }
             }
         });
-    }
-
-
-    private boolean deleteEmailFromServer(Email email) {
-        Socket socket = null;
-        try {
-            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-            NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-            NetworkUtils.sendObject(socket, email.getId());
-            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-
-            String response = (String) NetworkUtils.receiveObject(socket);
-            return "OK".equals(response);
-        } catch (Exception e) {
-            handleConnectionError(e);
-            return false;
-        } finally {
-            if (socket != null && !socket.isClosed()) {
-                try {
-                    socket.close();
-                } catch (IOException e) {
-                    System.err.println("Errore chiusura socket: " + e.getMessage());
-                }
-            }
-        }
     }
 
 
