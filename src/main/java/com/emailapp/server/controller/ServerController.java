@@ -191,8 +191,6 @@ public class ServerController {
 
         boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
         NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
-
-        // Enhanced logging messages with emojis for better visibility
         if (deleted) {
             logEvent("✅ Email eliminata con successo - ID: " + emailId + " | Utente: " + requestingUser);
         } else {

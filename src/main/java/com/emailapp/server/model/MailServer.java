@@ -53,7 +53,7 @@ public class MailServer {
             }
 
             String recipientsStr = String.join(", ", recipients);
-            serverController.logEvent("Email inviate da : " + sender + " a: " + recipientsStr);
+            serverController.logEvent(" 📧 Email inviata da : " + sender + " a: " + recipientsStr);
         }
     }
 
@@ -95,10 +95,8 @@ public class MailServer {
                 if (deletedFromInbox || deletedFromSent) {
                     try {
                         EmailFileManager.deleteEmail(emailId, requestingUser);
-                        serverController.logEvent("📧 Email " + emailId + " rimossa dal sistema per l'utente " + requestingUser);
                         return true;
                     } catch (IOException e) {
-                        serverController.logEvent("❌ Errore durante l'eliminazione del file email " + emailId + ": " + e.getMessage());
                         e.printStackTrace();
                         return false;
                     }
