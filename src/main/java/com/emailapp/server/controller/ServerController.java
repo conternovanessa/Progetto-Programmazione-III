@@ -75,84 +75,114 @@ public class ServerController {
     }
 
     private void handleClient(Socket clientSocket) {
-        try (ObjectInputStream inputStream = new ObjectInputStream(clientSocket.getInputStream())) {
-            clientSocket.setSoTimeout(30000);
+        try {
+            clientSocket.setSoTimeout(30000); // 30 secondi timeout
+            String command = (String) NetworkUtils.receiveObject(clientSocket);
 
-            String command = (String) inputStream.readObject();
             switch (command) {
                 case "SEND_EMAIL":
                     handleSendEmail(clientSocket);
                     break;
-                case "FETCH_NEW_EMAILS":
-                    handleFetchNewEmails(clientSocket);
+                case "PREPARE_REPLY":
+                    handlePrepareReply(clientSocket);
+                    break;
+                case "PREPARE_REPLY_ALL":
+                    handlePrepareReplyAll(clientSocket);
+                    break;
+                case "PREPARE_FORWARD":
+                    handlePrepareForward(clientSocket);
                     break;
                 case "DELETE_EMAIL":
                     handleDeleteEmail(clientSocket);
                     break;
+                case "FETCH_EMAILS":
+                    handleFetchEmails(clientSocket);
+                    break;
                 case "PING":
-                    NetworkUtils.sendObject(clientSocket, "PONG");
+                    handlePing(clientSocket);
                     break;
                 default:
-                    logEvent("Comando sconosciuto: " + command);
+                    logEvent("❓ Comando sconosciuto: " + command);
+                    NetworkUtils.sendObject(clientSocket, "ERROR: Comando sconosciuto");
             }
-        } catch (SocketException se) {
-            if (!se.getMessage().contains("Socket closed")) {
-                logEvent("Errore socket: " + se.getMessage());
-            }
-        } catch (EOFException eof) {
-            // Client disconnesso normalmente
+
         } catch (Exception e) {
-            logEvent("Errore gestione client: " + e.getMessage());
+            logEvent("❌ Errore gestione client: " + e.getMessage());
         } finally {
             closeClientSocket(clientSocket);
         }
     }
 
     private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        Email email = (Email) NetworkUtils.receiveObject(clientSocket);
+        Email newEmail = (Email) NetworkUtils.receiveObject(clientSocket);
+        String senderEmail = (String) NetworkUtils.receiveObject(clientSocket);
+
         try {
-            mailServer.sendEmail(email);
+            mailServer.sendEmail(newEmail);
             NetworkUtils.sendObject(clientSocket, "OK");
-            logEvent("✅ Email inviata: " + email.getSender() + " → " + email.getRecipients());
+            logEvent("✅ Email inviata da: " + senderEmail);
+        } catch (Exception e) {
+            NetworkUtils.sendObject(clientSocket, "ERROR: " + e.getMessage());
+            logEvent("❌ Invio fallito da: " + senderEmail);
+        }
+    }
+
+    private void handlePrepareReply(Socket clientSocket) throws IOException, ClassNotFoundException {
+        int replyEmailId = (int) NetworkUtils.receiveObject(clientSocket);
+        try {
+            boolean canReply = mailServer.canAccessEmail(replyEmailId);
+            NetworkUtils.sendObject(clientSocket, canReply ? "OK" : "ERROR");
+            logEvent("🔄 Preparazione risposta per email: " + replyEmailId);
         } catch (Exception e) {
             NetworkUtils.sendObject(clientSocket, "ERROR");
-            logEvent("❌ Invio fallito da: " + email.getSender() + " - Errore: " + e.getMessage());
+            logEvent("❌ Errore preparazione risposta per email: " + replyEmailId);
         }
     }
 
-
-    private void handleFetchNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
-        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
-        List<Email> newEmails = mailServer.getNewEmails(recipient);
-
-        // Inizializza il set per il client se non esiste
-        notifiedEmailsPerClient.putIfAbsent(recipient, new HashSet<>());
-        Set<Integer> clientNotifiedEmails = notifiedEmailsPerClient.get(recipient);
-
-        // Filtra le email non notificate per questo specifico client
-        List<Email> unnotifiedEmails = newEmails.stream()
-                .filter(email -> !clientNotifiedEmails.contains(email.getId()))
-                .filter(email -> email.getRecipients().contains(recipient))
-                .collect(Collectors.toList());
-
-        if (!unnotifiedEmails.isEmpty()) {
-            unnotifiedEmails.forEach(email -> clientNotifiedEmails.add(email.getId()));
-            logEvent("📨 Recuperate " + unnotifiedEmails.size() + " email per: " + recipient);
+    private void handlePrepareReplyAll(Socket clientSocket) throws IOException, ClassNotFoundException {
+        int replyAllEmailId = (int) NetworkUtils.receiveObject(clientSocket);
+        try {
+            boolean canReplyAll = mailServer.canAccessEmail(replyAllEmailId);
+            NetworkUtils.sendObject(clientSocket, canReplyAll ? "OK" : "ERROR");
+            logEvent("🔄 Preparazione risposta a tutti per email: " + replyAllEmailId);
+        } catch (Exception e) {
+            NetworkUtils.sendObject(clientSocket, "ERROR");
+            logEvent("❌ Errore preparazione risposta a tutti per email: " + replyAllEmailId);
         }
-
-        NetworkUtils.sendObject(clientSocket, newEmails);
     }
 
+    private void handlePrepareForward(Socket clientSocket) throws IOException, ClassNotFoundException {
+        int forwardEmailId = (int) NetworkUtils.receiveObject(clientSocket);
+        try {
+            boolean canForward = mailServer.canAccessEmail(forwardEmailId);
+            NetworkUtils.sendObject(clientSocket, canForward ? "OK" : "ERROR");
+            logEvent("↪ Preparazione inoltro per email: " + forwardEmailId);
+        } catch (Exception e) {
+            NetworkUtils.sendObject(clientSocket, "ERROR");
+            logEvent("❌ Errore preparazione inoltro per email: " + forwardEmailId);
+        }
+    }
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+        int deleteEmailId = (int) NetworkUtils.receiveObject(clientSocket);
         String requestingUser = (String) NetworkUtils.receiveObject(clientSocket);
 
-        boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
+        boolean deleted = mailServer.deleteEmail(deleteEmailId, requestingUser);
         NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
         logEvent(deleted ?
-                "🗑️ Email " + emailId + " eliminata da: " + requestingUser :
-                "❌ Eliminazione " + emailId + " fallita per: " + requestingUser);
+                "🗑 Email " + deleteEmailId + " eliminata da: " + requestingUser :
+                "❌ Eliminazione email " + deleteEmailId + " fallita per: " + requestingUser);
+    }
+
+    private void handleFetchEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
+        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
+        List<Email> emails = mailServer.getEmailsForUser(recipient);
+        NetworkUtils.sendObject(clientSocket, emails);
+        logEvent("📨 Inviate " + emails.size() + " email a: " + recipient);
+    }
+
+    private void handlePing(Socket clientSocket) throws IOException {
+        NetworkUtils.sendObject(clientSocket, "PONG");
     }
 
     private void closeClientSocket(Socket socket) {
@@ -223,10 +253,6 @@ public class ServerController {
 
     public void logEvent(String message) {
         Platform.runLater(() -> logTextArea.appendText(message + "\n"));
-    }
-
-    public MailServer getMailServer() {
-        return mailServer;
     }
 
     public boolean isRunning() {

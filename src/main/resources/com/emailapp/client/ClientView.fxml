@@ -18,7 +18,7 @@
 
         <center>
             <SplitPane dividerPositions="0.4">
-                <TableView fx:id="emailTableView" onMouseClicked="#handleEmailSelection">
+                <TableView fx:id="emailTableView">
                     <columns>
                         <TableColumn fx:id="senderColumn" text="Sender" />
                         <TableColumn fx:id="subjectColumn" text="Subject" />
@@ -51,7 +51,8 @@
                         <TextArea fx:id="bodyArea" VBox.vgrow="ALWAYS" promptText="Compose your email here..." />
                         <HBox spacing="10" alignment="CENTER_RIGHT">
                             <Button fx:id="sendButton" text="Send" onAction="#handleSendEmail" />
-                            <Button text="Back" onAction="#handleBackInCompose" />
+                            <Button text="Back" onAction="#handleBackButton" />
+
                         </HBox>
                     </VBox>
                 </StackPane>

@@ -105,6 +105,32 @@ public class MailServer {
             }
         }
     }
+    public boolean canAccessEmail(int emailId) {
+        synchronized (emailLock) {
+            synchronized (accountLock) {
+                for (EmailAccount account : accounts.values()) {
+                    if (account.getInbox().stream().anyMatch(email -> email.getId() == emailId) ||
+                            account.getSent().stream().anyMatch(email -> email.getId() == emailId)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+    }
+
+    public List<Email> getEmailsForUser(String recipient) {
+        synchronized (emailLock) {
+            synchronized (accountLock) {
+                createAccount(recipient);
+                EmailAccount account = accounts.get(recipient);
+                List<Email> allEmails = new ArrayList<>();
+                allEmails.addAll(account.getInbox());
+                allEmails.addAll(account.getSent());
+                return allEmails;
+            }
+        }
+    }
 
 
     public boolean deleteEmail(int emailId, String requestingUser) {

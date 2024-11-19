@@ -320,7 +320,7 @@ public class ClientController {
     }
 
 
-    private void checkConnection() {
+    public void checkConnection() {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, "PING");
             String response = (String) NetworkUtils.receiveObject(socket);
