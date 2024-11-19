@@ -17,10 +17,10 @@ import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class ServerController {
     private final MailServer mailServer;
@@ -28,6 +28,8 @@ public class ServerController {
     private ServerSocket serverSocket;
     private boolean isRunning;
     private static final int DEFAULT_PORT = 5000;
+    private Set<Integer> notifiedEmailIds = new HashSet<>();
+    private Map<String, Set<Integer>> notifiedEmailsPerClient = new HashMap<>();
 
     @FXML private Label portLabel;
     @FXML private Button startStopButton;
@@ -45,33 +47,17 @@ public class ServerController {
         updateButtonState();
     }
 
-    @FXML
-    private void handleStartStop() {
-        if (isRunning) {
-            handleStopServer();
-        } else {
-            int port = Integer.parseInt(portLabel.getText());
-            startServer(port);
-        }
-        updateButtonState();
-    }
-
-    private void updateButtonState() {
-        startStopButton.setText(isRunning ? "Stop Server" : "Start Server");
-    }
-
     public void startServer(int port) {
-        if (isRunning) {
-            return;
-        }
+        if (isRunning) return;
+
         try {
             serverSocket = new ServerSocket(port);
             isRunning = true;
-            mailServer.loadExistingEmails(); // Direct call on mailServer instance
+            mailServer.loadExistingEmails();
             executorService.submit(this::acceptConnections);
             logEvent("Server avviato sulla porta " + port);
         } catch (IOException e) {
-            logEvent("Impossibile avviare il server: " + e.getMessage());
+            logEvent("Errore avvio server: " + e.getMessage());
         }
     }
 
@@ -82,109 +68,81 @@ public class ServerController {
                 executorService.submit(() -> handleClient(clientSocket));
             } catch (IOException e) {
                 if (isRunning) {
-                    logEvent("Errore durante l'accettazione della connessione client: " + e.getMessage());
+                    logEvent("Errore connessione client: " + e.getMessage());
                 }
             }
         }
     }
 
     private void handleClient(Socket clientSocket) {
-        ObjectInputStream inputStream = null;
-        boolean isAbnormalDisconnection = false;
-
-        try {
-            inputStream = new ObjectInputStream(clientSocket.getInputStream());
+        try (ObjectInputStream inputStream = new ObjectInputStream(clientSocket.getInputStream())) {
             clientSocket.setSoTimeout(30000);
 
-            while (!clientSocket.isClosed()) {
-                try {
-                    String command = (String) inputStream.readObject();
-                    if (command == null) {
-                        break;
-                    }
-
-                    switch (command) {
-                        case "SEND_EMAIL":
-                            handleSendEmail(clientSocket);
-                            break;
-                        case "FETCH_NEW_EMAILS":
-                            handleFetchNewEmails(clientSocket);
-                            break;
-                        case "DELETE_EMAIL":
-                            handleDeleteEmail(clientSocket);
-                            break;
-                        case "PING":
-                            NetworkUtils.sendObject(clientSocket, "PONG");
-                            break;
-                        default:
-                            logEvent("Comando sconosciuto ricevuto: " + command);
-                            break;
-                    }
-                } catch (SocketException se) {
-                    if (se.getMessage().contains("Ripristino della connessione") ||
-                            se.getMessage().contains("Socket chiusa") ||
-                            se.getMessage().contains("Lettura scaduta")) {
-                        break;
-                    }
-                    isAbnormalDisconnection = true;
-                    logEvent("Errore socket imprevisto: " + se.getMessage());
+            String command = (String) inputStream.readObject();
+            switch (command) {
+                case "SEND_EMAIL":
+                    handleSendEmail(clientSocket);
                     break;
-                }
+                case "FETCH_NEW_EMAILS":
+                    handleFetchNewEmails(clientSocket);
+                    break;
+                case "DELETE_EMAIL":
+                    handleDeleteEmail(clientSocket);
+                    break;
+                case "PING":
+                    NetworkUtils.sendObject(clientSocket, "PONG");
+                    break;
+                default:
+                    logEvent("Comando sconosciuto: " + command);
             }
-        } catch (IOException | ClassNotFoundException e) {
-            if (isRunning && !(e instanceof EOFException)) {
-                isAbnormalDisconnection = true;
-                logEvent("Errore nella connessione del client: " + e.getMessage());
+        } catch (SocketException se) {
+            if (!se.getMessage().contains("Socket closed")) {
+                logEvent("Errore socket: " + se.getMessage());
             }
+        } catch (EOFException eof) {
+            // Client disconnesso normalmente
+        } catch (Exception e) {
+            logEvent("Errore gestione client: " + e.getMessage());
         } finally {
-            try {
-                if (inputStream != null) {
-                    inputStream.close();
-                }
-                if (!clientSocket.isClosed()) {
-                    clientSocket.close();
-                    if (isAbnormalDisconnection) {
-                        logEvent("Connessione client chiusa dopo un errore");
-                    }
-                }
-            } catch (IOException e) {
-                if (isRunning) {
-                    logEvent("Errore durante la chiusura delle risorse client:" + e.getMessage());
-                }
-            }
+            closeClientSocket(clientSocket);
         }
     }
 
     private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
+        Email email = (Email) NetworkUtils.receiveObject(clientSocket);
         try {
-            Email email = (Email) NetworkUtils.receiveObject(clientSocket);
             mailServer.sendEmail(email);
-        } finally {
-            if (clientSocket != null && !clientSocket.isClosed()) {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    logEvent("Errore durante la chiusura del socket in handleSendEmail: " + e.getMessage());
-                }
-            }
+            NetworkUtils.sendObject(clientSocket, "OK");
+            logEvent("✅ Email inviata: " + email.getSender() + " → " + email.getRecipients());
+        } catch (Exception e) {
+            NetworkUtils.sendObject(clientSocket, "ERROR");
+            logEvent("❌ Invio fallito da: " + email.getSender() + " - Errore: " + e.getMessage());
         }
     }
 
+
     private void handleFetchNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
-        try {
-            String recipient = (String) NetworkUtils.receiveObject(clientSocket);
-            List<Email> newEmails = mailServer.getNewEmails(recipient);
-            NetworkUtils.sendObject(clientSocket, newEmails);
-        } finally {
-            if (clientSocket != null && !clientSocket.isClosed()) {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    logEvent("Errore durante la chiusura del socket in handleFetchNewEmails: " + e.getMessage());
-                }
-            }
+        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
+        List<Email> newEmails = mailServer.getNewEmails(recipient);
+
+        // Inizializza il set per il client se non esiste
+        notifiedEmailsPerClient.putIfAbsent(recipient, new HashSet<>());
+        Set<Integer> clientNotifiedEmails = notifiedEmailsPerClient.get(recipient);
+
+        // Filtra le email non notificate per questo specifico client
+        List<Email> unnotifiedEmails = newEmails.stream()
+                .filter(email -> !clientNotifiedEmails.contains(email.getId()))
+                .filter(email -> email.getRecipients().contains(recipient))
+                .collect(Collectors.toList());
+
+        if (!unnotifiedEmails.isEmpty()) {
+            unnotifiedEmails.forEach(email -> clientNotifiedEmails.add(email.getId()));
+            logEvent("📨 Recuperate " + unnotifiedEmails.size() + " email per: " + recipient);
         }
+
+        NetworkUtils.sendObject(clientSocket, newEmails);
     }
+
 
     private void handleDeleteEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
         int emailId = (int) NetworkUtils.receiveObject(clientSocket);
@@ -192,54 +150,76 @@ public class ServerController {
 
         boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
         NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
-        if (deleted) {
-            logEvent("✅ Email eliminata con successo - ID: " + emailId + " | Utente: " + requestingUser);
-        } else {
-            logEvent("❌ Eliminazione email fallita - ID: " + emailId + " | Utente: " + requestingUser);
+        logEvent(deleted ?
+                "🗑️ Email " + emailId + " eliminata da: " + requestingUser :
+                "❌ Eliminazione " + emailId + " fallita per: " + requestingUser);
+    }
+
+    private void closeClientSocket(Socket socket) {
+        try {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+        } catch (IOException e) {
+            logEvent("Errore chiusura socket: " + e.getMessage());
         }
     }
 
     @FXML
-    public void handleStopServer() {
-        if (!isRunning) {
-            return;
+    private void handleStartStop() {
+        if (isRunning) {
+            handleStopServer();
+        } else {
+            startServer(DEFAULT_PORT);
         }
-
-        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
-        confirmAlert.setTitle("Stop Server");
-        confirmAlert.setHeaderText("Vuoi davvero chiudere il server?");
-        confirmAlert.setContentText("Questa operazione disconnetterà tutti i client attualmente connessi");
-
-        Optional<ButtonType> result = confirmAlert.showAndWait();
-        if (result.isPresent() && result.get() == ButtonType.OK) {
-            stopServer();
-
-            Alert infoAlert = new Alert(Alert.AlertType.INFORMATION);
-            infoAlert.setTitle("Server chiuso");
-            infoAlert.setHeaderText(null);
-            infoAlert.setContentText("Il server è stato chiuso correttamente. Tutti i client sono stati disconnessi");
-            infoAlert.showAndWait();
-        }
+        updateButtonState();
     }
 
     public void stopServer() {
-        if (!isRunning) {
-            return;
-        }
+        if (!isRunning) return;
+
         isRunning = false;
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
-            } catch (IOException e) {
-                logEvent("Errore durante la chiusura del socket del server: " + e.getMessage());
             }
+            executorService.shutdownNow();
+            executorService = Executors.newCachedThreadPool();
+            logEvent("Server arrestato");
+        } catch (IOException e) {
+            logEvent("Errore arresto server: " + e.getMessage());
         }
-        executorService.shutdownNow();
-        executorService = Executors.newCachedThreadPool();
-        logEvent("Server stopped");
         Platform.runLater(() -> startStopButton.setText("Start Server"));
     }
 
+    @FXML
+    public void handleStopServer() {
+        if (!isRunning) return;
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Arresto Server");
+        alert.setHeaderText("Conferma arresto server");
+        alert.setContentText("Tutti i client verranno disconnessi. Continuare?");
+
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                stopServer();
+                showServerStoppedAlert();
+            }
+        });
+    }
+
+    private void showServerStoppedAlert() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Server Arrestato");
+        alert.setHeaderText(null);
+        alert.setContentText("Il server è stato arrestato correttamente");
+        alert.show();
+    }
+
+    private void updateButtonState() {
+        startStopButton.setText(isRunning ? "Stop Server" : "Start Server");
+    }
 
     public void logEvent(String message) {
         Platform.runLater(() -> logTextArea.appendText(message + "\n"));

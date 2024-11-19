@@ -376,79 +376,47 @@ public class ClientController {
     }
 
     private synchronized boolean sendEmail(Email email) {
-        synchronized (emailOperationLock) {
-            Socket socket = null;
-            try {
-                socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-                NetworkUtils.sendObject(socket, "SEND_EMAIL");
-                NetworkUtils.sendObject(socket, email);
-                String response = (String) NetworkUtils.receiveObject(socket);
-
-                if ("OK".equals(response)) {
-                    Platform.runLater(() -> {
-                        mailbox.addSentEmail(email);
-                        refreshEmailTable();
-                        showInfoAlert("Email Inviata", "Email inviata correttamente a " + email.getRecipients());
-                    });
-                    return true;
-                } else {
-                    Platform.runLater(() -> {
-                        showErrorAlert("Errore di Invio", "Impossibile inviare l'email: " + response);
-                    });
-                    return false;
-                }
-            } catch (Exception e) {
-                handleConnectionError(e);
-                return false;
-            } finally {
-                if (socket != null && !socket.isClosed()) {
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        System.err.println("Errore chiusura socket: " + e.getMessage());
-                    }
-                }
-            }
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "SEND_EMAIL");
+            NetworkUtils.sendObject(socket, email);
+            String response = (String) NetworkUtils.receiveObject(socket);
+            return "OK".equals(response);
+        } catch (Exception e) {
+            handleConnectionError(e);
+            return false;
         }
     }
 
     private synchronized void fetchNewEmails() {
-        synchronized (emailOperationLock) {
-            Socket socket = null;
-            try {
-                socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-                NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-                List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
-
-                Platform.runLater(() -> {
-                    int newEmailCount = 0;
-                    for (Email email : newEmails) {
-                        if (!deletedEmailIds.contains(email.getId()) &&
-                                !mailbox.hasEmail(email.getId())) {
-                            mailbox.addReceivedEmail(email);
-                            newEmailCount++;
-                        }
-                    }
-                    if (newEmailCount > 0) {
-                        refreshEmailTable();
-                        showInfoAlert("Nuova mail per: " + mailbox.getEmailAddress(),
-                                "Ricevuta una nuova email");
-                    }
-                });
-            } catch (Exception e) {
-                handleConnectionError(e);
-            } finally {
-                if (socket != null && !socket.isClosed()) {
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        System.err.println("Errore chiusura socket: " + e.getMessage());
-                    }
-                }
-            }
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "FETCH_NEW_EMAILS");
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+            List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
+            handleNewEmails(newEmails);
+        } catch (Exception e) {
+            handleConnectionError(e);
         }
     }
+
+    private void handleNewEmails(List<Email> newEmails) {
+        Platform.runLater(() -> {
+            int newEmailCount = 0;
+            for (Email email : newEmails) {
+                if (!deletedEmailIds.contains(email.getId()) &&
+                        !mailbox.hasEmail(email.getId())) {
+                    mailbox.addReceivedEmail(email);
+                    newEmailCount++;
+                }
+            }
+
+            if (newEmailCount > 0) {
+                refreshEmailTable();
+                showInfoAlert("Nuove email per: " + mailbox.getEmailAddress(),
+                        "Ricevute " + newEmailCount + " nuove email");
+            }
+        });
+    }
+
 
     @FXML
     private void handleReplyEmail() {
@@ -493,58 +461,24 @@ public class ClientController {
     }
 
     private void deleteEmail(Email email) {
-        executorService.submit(() -> {
-            Socket socket = null;
-            try {
-                socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-                NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-                NetworkUtils.sendObject(socket, email.getId());
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "DELETE_EMAIL");
+            NetworkUtils.sendObject(socket, email.getId());
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+            String response = (String) NetworkUtils.receiveObject(socket);
 
-                Object response = NetworkUtils.receiveObject(socket);
-                String responseStr = response != null ? response.toString() : null;
-
-                if ("OK".equals(responseStr)) {
-                    // Delete from local file system
-                    EmailFileManager.deleteEmail(email.getId(), mailbox.getEmailAddress());
-
-                    // Update UI on JavaFX thread
-                    Platform.runLater(() -> {
-                        // Remove from mailbox
-                        mailbox.removeEmail(email);
-                        // Add to deleted IDs set
-                        deletedEmailIds.add(email.getId());
-                        // Clear selection
-                        emailTableView.getSelectionModel().clearSelection();
-                        // Force refresh table
-                        emailTableView.refresh();
-                        // Return to list view
-                        returnToEmailListView();
-                        // Show confirmation
-                        showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
-                    });
-                } else {
-                    Platform.runLater(() -> {
-                        showErrorAlert("Errore", "Impossibile eliminare l'email dal server.");
-                    });
-                }
-            } catch (IOException | ClassNotFoundException e) {
+            if ("OK".equals(response)) {
                 Platform.runLater(() -> {
-                    showErrorAlert("Errore", "Si è verificato un errore durante l'eliminazione dell'email: " + e.getMessage());
+                    mailbox.removeEmail(email);
+                    deletedEmailIds.add(email.getId());
+                    returnToEmailListView();
+                    showInfoAlert("Email eliminata", "L'email è stata eliminata con successo.");
                 });
-                e.printStackTrace();
-            } finally {
-                if (socket != null && !socket.isClosed()) {
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        System.err.println("Errore chiusura socket: " + e.getMessage());
-                    }
-                }
             }
-        });
+        } catch (Exception e) {
+            handleConnectionError(e);
+        }
     }
-
 
     private boolean deleteEmailFromServer(Email email) {
         Socket socket = null;
