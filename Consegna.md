@@ -1,0 +1,60 @@
+PROGETTO DI LABORATORIO DI PROGRAMMAZIONE III:
+- [ ] Mail server gestisce una lista di caselle di posta elettronica
+- [ ] Mantiene la persistenza dei file (txt o binari) per memorizzare i messaggi in maniera permanente.
+- [ ] Il mail server h un'interfafccia grafica sulla quale viene visualizzato il log delle azioni effettuate dal client:
+  - [ ] Apertura-chiusura di una connessione tra client e server
+  - [ ] Invio di messaggi da parte del client
+  - [ ] Ricezione di messaggi da parte del client
+  - [ ] Errori di consegna di messaggi
+- [ ] Mail client ha assocato un particolare ccount di posta elettronica, ha un'interfaccia grafica così caratterozzata:
+  - [ ] Creare e inviare un messaggio a 1 o più destinatari:
+    - [ ] Il server dev'essere attivo
+    - [ ] Il client chiede al server di aprire una socket di scrittura
+    - [ ] Il server garantisce al client l'apertura della socket
+    - [ ] Il client scrive la mail al server.
+    - [ ] Il server controlla che gli account di destinazione siano contenuti in un file in cui vi è l'elenco dei client: email.txt
+    - [ ] Se i client sono contenuti allora apre una socket per poter inviare il file ai/al destinatari/io e chude la socket richiesta dal client per scrivere.
+    - [ ] La mailbox dev'essere aggiornata solo con le mail nuove non ricaricare tutte le mail tute le volte.
+    - [ ] La mail deve compartire sia nel mittente che nel destinatario, in due sezioni separate
+  - [ ] Leggere i messaggi dalla caseela di posta
+    - [ ] Caricare una lista osservabile che permette di aprire le mail per vedere le informazioni al suo interno contenute
+    - [ ] Una mail deve avere un identificativo unico, la data, l'ora, il/i destinatario/i , il mittente, oggetto e il corpo.
+    - [ ] Non dev'essere caricata per intero nel mailbox, ma deve poter avere la possibilità di aprire la mail per vedere i dettagli o solo una riga di selezione.
+  - [ ] Rispondere a un messaggio ricevuto, in Reply e/o Reply all:
+    - [ ] Il server dopo aver garantito l'apertura della socket deve compilare i campi del messaggio e il client deve solo aggiungere il corpo.
+    - [ ] In questo caso nelle mail inviate deve essere salvata la risposta.
+    - [ ] Il campo oggetto della reply deve avere il tag: <RA: > o <RE_ALL: >
+  - [ ] Girare un messaggio a uno o più account di posta
+    - [ ] Il check dei destinatari dev'essere fatto dal server non dai client
+    - [ ] Il campo oggetto dev'essere : < FWD: >
+  - [ ] Rimuovere un messaggio dalla casella di posta elettronica
+    - [ ] Il client fa richiesta di eliminazione della mail al server
+    - [ ] Il server cancella la mail sul suo server e invia una booleana di successo della cancellazione
+    - [ ] Il client dopo l'avvenuta cancellazione da parte del server cancella localmente la mail
+    - [ ] L'eliminazione avviene con successo sia sul server che localmente per eliminare la mail di permanenza
+  - [ ] L'interfaccia dei client è sempre aggiornata dei messaggi in casella, quando arriva un messaggio l'utente viene ntificato con una finestra di dialogo.
+  - [ ] accopunt di posta è associato a una sola casella di posta eletronica e la sua interfaccia non richiede autenticazione da mparte dell'utente
+  - [ ] Il mail client non deve andare in crash se il mail server viene spento , deve pèoter gestire i problemi di connessione al mail server inviando
+        opportuni messaggi di errore all'utente e fare in modo che il nmail client si riconnetta automaticamente al serverquando questo torna attivo
+  REQUISITI TECNICI:
+  - [ ] Per la dimostrazione si assuma di avere 3 utenti di posta elettronica che comunicano ra di loro.
+    - [ ] Il sistema deve però essere scalabile a molti utenti
+  - [ ] applicazione sviluppata in JavaFXML
+  - [ ] basata su architettura MVC: controller + viste e model
+    - [ ] non ci dev'essere collegamento diretto tra viste e model 
+  - [ ] Seguire il pattern Observer Observable
+  - [ ] L'utente deve poter correggere eventyulai input errati
+    - [ ] dominio sbagliato -> non invio nemmeno al server
+    - [ ] account sbagliato -> server ti dfice a quali utenti lo puoi mandare
+  - [ ] client e server deve parallelizzare le attività che non necessitano di eseuzione sequenziale e gestire eventuali problemi di mutua esclusione
+    - [ ] azioni da parallelizza: creazione- gestione di messaggi e ricezione dei messaggi
+  - [ ] l'applicazione dev'essere distribuita con l'utilizzo delle socket Java
+  - [ ] No si devono gestire socket permamenti: deve seguitre il protocollo HTTP 1.0 il client chiede di aprire la connessione ad ognioperazione.
+  - [ ] L'aggiornamento dei messaggi dev'essere solo per il messaggio nuovo non dev'essere ricaricata tutta la mialbox per intero.
+REQUISITI INTERFACCIA UTENTE:
+- [ ] Comprensibile: soprattutto a fonte di errori l'utente deve poter dapere cosa sta sbagliato e come si può sistemare
+- [ ] Ragionevole efficiente: permettere all'utente di eseguire le operazioni con un numero minimo di click e di inserimento di dati.
+- [ ] implementato con JavaFXMl e se necessartio Thread di Java
+  - [ ] consigkliato uso di Java Beans
+  - [ ] properties
+  - [ ] binding properties  
