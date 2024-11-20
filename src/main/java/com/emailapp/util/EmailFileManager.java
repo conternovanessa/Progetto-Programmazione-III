@@ -40,12 +40,11 @@ public class EmailFileManager {
     }
 
     public static synchronized int getNextId() {
-        int currentId = idCounter.get();
-        int nextId = currentId + 1;
-        idCounter.set(nextId);
+        int nextId = idCounter.incrementAndGet();
         updateIdFile(nextId);
         return nextId;
     }
+
 
     public static void saveEmail(Email email, String userEmail) throws IOException {
         if (!email.getRecipients().contains(userEmail)) {

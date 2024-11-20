@@ -28,6 +28,7 @@ public class ServerController {
     private static final int SOCKET_TIMEOUT = 30000;// 30 secondi
     private Set<String> initialFetchDone = new HashSet<>();
 
+
     @FXML private Label portLabel;
     @FXML private Button startStopButton;
     @FXML private TextArea logTextArea;
@@ -233,12 +234,14 @@ public class ServerController {
         try {
             mailServer.sendEmail(newEmail);
             NetworkUtils.sendObject(clientSocket, "OK");
-            logEvent("✅ Email inviata da: " + senderEmail);
+            String recipientsStr = String.join(", ", newEmail.getRecipients());
+            logEvent("📧 Email inviata da : " + senderEmail + " a: " + recipientsStr);
         } catch (Exception e) {
-            sendError(clientSocket, "Errore nell'invio dell'email: " + e.getMessage());
+            NetworkUtils.sendObject(clientSocket, "ERROR: " + e.getMessage());
             logEvent("❌ Invio fallito da: " + senderEmail);
         }
     }
+
 
     private void handlePrepareReply(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
         int emailId = (int) NetworkUtils.receiveObject(clientSocket);
@@ -279,8 +282,21 @@ public class ServerController {
     private void handleFetchEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
         List<Email> emails = mailServer.getEmailsForUser(recipient);
-        NetworkUtils.sendObject(clientSocket, emails);
-        logEvent("📨 Inviate " + emails.size() + " email a: " + recipient);
+
+        // Filter emails to only include those where this recipient is actually in the recipients list
+        List<Email> recipientEmails = emails.stream()
+                .filter(email -> email.getRecipients().contains(recipient))
+                .collect(Collectors.toList());
+
+        NetworkUtils.sendObject(clientSocket, recipientEmails);
+
+        if (!initialFetchDone.contains(recipient)) {
+            String message = recipientEmails.size() == 1
+                    ? "📨 Inviata " + recipientEmails.size() + " email a: " + recipient
+                    : "📨 Inviate " + recipientEmails.size() + " email a: " + recipient;
+            logEvent(message);
+            initialFetchDone.add(recipient);
+        }
     }
 
     private void handlePing(Socket clientSocket) throws IOException {

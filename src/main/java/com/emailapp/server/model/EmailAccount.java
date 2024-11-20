@@ -24,7 +24,9 @@ public class EmailAccount {
     }
 
     public void addToInbox(Email email) {
-        inbox.add(email);
+        if (inbox.stream().noneMatch(e -> e.getId() == email.getId())) {
+            inbox.add(email);
+        }
     }
 
     public void addToSent(Email email) {
