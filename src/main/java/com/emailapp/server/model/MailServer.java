@@ -105,7 +105,7 @@ public class MailServer {
             }
         }
     }
-    public boolean canAccessEmail(int emailId) {
+    public boolean canAccessEmail(int emailId, String requestingUser) {
         synchronized (emailLock) {
             synchronized (accountLock) {
                 for (EmailAccount account : accounts.values()) {
@@ -160,4 +160,29 @@ public class MailServer {
         }
     }
 
-}
+    public Email getEmailById(int emailId, String requestingUser) {
+    synchronized (emailLock) {
+        synchronized (accountLock) {
+            for (EmailAccount account : accounts.values()) {
+                Email email = account.getInbox().stream()
+                        .filter(e -> e.getId() == emailId)
+                        .findFirst()
+                        .orElse(null);
+
+                if (email != null) {
+                    return email;
+                }
+
+                email = account.getSent().stream()
+                        .filter(e -> e.getId() == emailId)
+                        .findFirst()
+                        .orElse(null);
+
+                if (email != null) {
+                    return email;
+                }
+            }
+        }
+    }
+    return null; // or throw an exception if not found
+}}
