@@ -85,7 +85,6 @@ public class ClientController {
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 if (isConnected()) {
-                    System.out.println("Fetching emails for: " + mailbox.getEmailAddress());
                     fetchEmails();
                 }
                 try {

@@ -316,8 +316,8 @@ public class ServerController {
 
         if (!initialFetchDone.contains(recipient)) {
             String message = recipientEmails.size() == 1
-                    ? "📨 Inviata " + recipientEmails.size() + " email a: " + recipient
-                    : "📨 Inviate " + recipientEmails.size() + " email a: " + recipient;
+                    ? "📨 Caricata " + recipientEmails.size() + " email su: " + recipient
+                    : "📨 Caricate " + recipientEmails.size() + " email su: " + recipient;
             logEvent(message);
             initialFetchDone.add(recipient);
         }
