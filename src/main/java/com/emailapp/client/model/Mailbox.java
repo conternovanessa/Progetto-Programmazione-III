@@ -75,7 +75,7 @@ public class Mailbox {
     }
 
     public synchronized void addReceivedEmail(Email email) {
-        if (!receivedEmails.contains(email)) {
+        if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
             receivedEmails.add(email);
         }
     }
@@ -93,10 +93,13 @@ public class Mailbox {
 
     public ObservableList<Email> getAllEmails() {
         ObservableList<Email> allEmails = FXCollections.observableArrayList();
-        allEmails.addAll(receivedEmails);
-        allEmails.addAll(sentEmails);
+        synchronized (this) {
+            allEmails.addAll(receivedEmails);
+            allEmails.addAll(sentEmails);
+        }
         return allEmails;
     }
+
 
     public int getTotalEmailCount() {
         return receivedEmails.size() + sentEmails.size();

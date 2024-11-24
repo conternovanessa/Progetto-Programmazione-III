@@ -6,6 +6,7 @@ import com.emailapp.client.model.Mailbox;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
@@ -58,17 +59,33 @@ public class ClientController {
     }
 
     private void setupEmailTableView() {
+        // Create and configure table columns
+        TableColumn<Email, String> senderColumn = new TableColumn<>("From");
+        senderColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSender()));
+
+        TableColumn<Email, String> subjectColumn = new TableColumn<>("Subject");
+        subjectColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSubject()));
+
+        TableColumn<Email, String> dateColumn = new TableColumn<>("Date");
+        dateColumn.setCellValueFactory(data -> new SimpleStringProperty(
+                data.getValue().getSentDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+        ));
+
+        // Set columns to table
+        emailTableView.getColumns().setAll(senderColumn, subjectColumn, dateColumn);
+
+        // Set selection listener
         emailTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             if (newSelection != null) {
                 handleEmailSelection(newSelection);
             }
         });
     }
-
     private void startEmailFetcher() {
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 if (isConnected()) {
+                    System.out.println("Fetching emails for: " + mailbox.getEmailAddress());
                     fetchEmails();
                 }
                 try {
@@ -82,6 +99,11 @@ public class ClientController {
 
     @FXML
     private void handleEmailSelection(Email email) {
+        if (!isConnected()) {
+            showErrorAlert("Server non raggiungibile", "Impossibile aprire l'email: server non disponibile");
+            return;
+        }
+
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, "MARK_AS_READ");
             NetworkUtils.sendObject(socket, email.getId());
@@ -91,11 +113,14 @@ public class ClientController {
             if ("OK".equals(response)) {
                 email.setRead(true);
                 displayEmailDetails(email);
+            } else {
+                showErrorAlert("Errore", "Impossibile aprire l'email");
             }
         } catch (Exception e) {
-            handleConnectionError();
+            showErrorAlert("Errore di connessione", "Impossibile contattare il server");
         }
     }
+
 
     private void setupConnectionListener() {
         connectedProperty.addListener((observable, oldValue, newValue) -> {
@@ -291,8 +316,11 @@ public class ClientController {
 
             Platform.runLater(() -> {
                 mailbox.clearEmails();
-                emails.forEach(mailbox::addReceivedEmail);
-                refreshEmailList();
+                if (emails != null) {
+                    emails.forEach(mailbox::addReceivedEmail);
+                    emailTableView.setItems(mailbox.getAllEmails());
+                    emailTableView.refresh();
+                }
             });
         } catch (Exception e) {
             handleConnectionError();
@@ -313,6 +341,7 @@ public class ClientController {
             actionButtons.setVisible(true);
         });
     }
+
 
     @FXML
     private void handleBackButton() {

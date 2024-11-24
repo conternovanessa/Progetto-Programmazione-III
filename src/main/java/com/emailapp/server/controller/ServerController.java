@@ -2,6 +2,7 @@ package com.emailapp.server.controller;
 
 import com.emailapp.client.model.Email;
 import com.emailapp.server.model.MailServer;
+import com.emailapp.util.EmailFileManager;
 import com.emailapp.util.NetworkUtils;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -79,7 +80,6 @@ public class ServerController {
             String command = (String) NetworkUtils.receiveObject(clientSocket);
             String requestingUser = null;
 
-            // Ottieni il requesting user per i comandi che lo richiedono
             if (requiresRequestingUser(command)) {
                 requestingUser = (String) NetworkUtils.receiveObject(clientSocket);
             }
@@ -89,36 +89,60 @@ public class ServerController {
                     NetworkUtils.sendObject(clientSocket, "OK");
                     logEvent("✅ Richiesta composizione nuova email");
                     break;
+
+                case "MARK_AS_READ":
+                    int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+                    String userEmail = (String) NetworkUtils.receiveObject(clientSocket);
+                    try {
+                        EmailFileManager.markEmailAsRead(emailId, userEmail);
+                        NetworkUtils.sendObject(clientSocket, "OK");
+                        logEvent("📧 Email " + emailId + " marcata come letta da " + userEmail);
+                    } catch (IOException e) {
+                        NetworkUtils.sendObject(clientSocket, "ERROR");
+                        logEvent("❌ Errore nella marcatura dell'email " + emailId + " come letta");
+                    }
+                    break;
+
                 case "GET_REPLY_TEMPLATE":
                     handleReplyTemplate(clientSocket, requestingUser);
                     break;
+
                 case "GET_REPLY_ALL_TEMPLATE":
                     handleReplyAllTemplate(clientSocket, requestingUser);
                     break;
+
                 case "GET_FORWARD_TEMPLATE":
                     handleForwardTemplate(clientSocket, requestingUser);
                     break;
+
                 case "SEND_EMAIL":
                     handleSendEmail(clientSocket);
                     break;
+
                 case "PREPARE_REPLY":
                     handlePrepareReply(clientSocket, requestingUser);
                     break;
+
                 case "PREPARE_REPLY_ALL":
                     handlePrepareReplyAll(clientSocket, requestingUser);
                     break;
+
                 case "PREPARE_FORWARD":
                     handlePrepareForward(clientSocket, requestingUser);
                     break;
+
                 case "DELETE_EMAIL":
                     handleDeleteEmail(clientSocket, requestingUser);
                     break;
+
                 case "FETCH_EMAILS":
                     handleFetchEmails(clientSocket);
                     break;
+
                 case "PING":
                     handlePing(clientSocket);
                     break;
+
                 default:
                     logEvent("❓ Comando sconosciuto: " + command);
                     sendError(clientSocket, "Comando sconosciuto");

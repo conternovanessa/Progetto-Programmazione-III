@@ -3,5 +3,5 @@ From: filippoditto@progetto.com
 To: vanessaconterno@progetto.com
 Subject: ciao
 Date: 2024-11-24T15:50:30.390098600
-Read: false
+Read: true
 Body: hola

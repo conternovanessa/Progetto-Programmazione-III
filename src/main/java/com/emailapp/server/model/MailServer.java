@@ -130,10 +130,15 @@ public class MailServer {
             synchronized (accountLock) {
                 createAccount(recipient);
                 EmailAccount account = accounts.get(recipient);
-                return account.getInbox();
+                List<Email> allEmails = new ArrayList<>();
+                // Aggiungi sia le email ricevute che quelle inviate
+                allEmails.addAll(account.getInbox());
+                allEmails.addAll(account.getSent());
+                return allEmails;
             }
         }
     }
+
 
 
     public boolean deleteEmail(int emailId, String requestingUser) {

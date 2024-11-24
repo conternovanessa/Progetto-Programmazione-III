@@ -84,9 +84,10 @@ public class EmailFileManager {
 
     public static List<Email> loadEmails(String userEmail) throws IOException {
         List<Email> emails = new ArrayList<>();
+        Path userDir = Paths.get(BASE_DIR, userEmail);
 
-        // Carica le email ricevute
-        Path inboxDir = Paths.get(BASE_DIR, userEmail, INBOX_DIR);
+        // Carica email dalla inbox
+        Path inboxDir = userDir.resolve(INBOX_DIR);
         if (Files.exists(inboxDir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(inboxDir, "Email_*.txt")) {
                 for (Path file : stream) {
@@ -98,8 +99,8 @@ public class EmailFileManager {
             }
         }
 
-        // Carica le email inviate
-        Path sentDir = Paths.get(BASE_DIR, userEmail, SENT_DIR);
+        // Carica email dalla cartella sent
+        Path sentDir = userDir.resolve(SENT_DIR);
         if (Files.exists(sentDir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(sentDir, "Email_*.txt")) {
                 for (Path file : stream) {
@@ -110,8 +111,10 @@ public class EmailFileManager {
                 }
             }
         }
+
         return emails;
     }
+
 
     private static Email readEmailFromFile(Path file) throws IOException {
         try (BufferedReader reader = Files.newBufferedReader(file)) {
