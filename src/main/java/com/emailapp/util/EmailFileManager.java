@@ -1,7 +1,6 @@
 package com.emailapp.util;
 
 import com.emailapp.client.model.Email;
-
 import java.io.*;
 import java.nio.file.*;
 import java.time.format.DateTimeFormatter;
@@ -10,6 +9,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class EmailFileManager {
     private static final String BASE_DIR = "emails";
+    private static final String INBOX_DIR = "inbox";
+    private static final String SENT_DIR = "sent";
     private static final String ID_FILE = "last_id.txt";
     private static final AtomicInteger idCounter = new AtomicInteger(0);
 
@@ -45,13 +46,20 @@ public class EmailFileManager {
         return nextId;
     }
 
-
     public static void saveEmail(Email email, String userEmail) throws IOException {
-        if (!email.getRecipients().contains(userEmail)) {
-            return;
+        // Se l'utente è il mittente, salva nella cartella sent
+        if (email.getSender().equals(userEmail)) {
+            saveEmailToDirectory(email, userEmail, SENT_DIR);
         }
+        // Se l'utente è tra i destinatari, salva nella cartella inbox
+        if (email.getRecipients().contains(userEmail)) {
+            saveEmailToDirectory(email, userEmail, INBOX_DIR);
+        }
+    }
 
-        Path userDir = Paths.get(BASE_DIR, userEmail);
+    private static void saveEmailToDirectory(Email email, String userEmail, String directory) throws IOException {
+        // Crea il percorso completo: emails/userEmail/sent o emails/userEmail/inbox
+        Path userDir = Paths.get(BASE_DIR, userEmail, directory);
         Files.createDirectories(userDir);
 
         String fileName = "Email_" + email.getId() + ".txt";
@@ -76,10 +84,24 @@ public class EmailFileManager {
 
     public static List<Email> loadEmails(String userEmail) throws IOException {
         List<Email> emails = new ArrayList<>();
-        Path userDir = Paths.get(BASE_DIR, userEmail);
 
-        if (Files.exists(userDir)) {
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(userDir, "Email_*.txt")) {
+        // Carica le email ricevute
+        Path inboxDir = Paths.get(BASE_DIR, userEmail, INBOX_DIR);
+        if (Files.exists(inboxDir)) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(inboxDir, "Email_*.txt")) {
+                for (Path file : stream) {
+                    Email email = readEmailFromFile(file);
+                    if (email != null) {
+                        emails.add(email);
+                    }
+                }
+            }
+        }
+
+        // Carica le email inviate
+        Path sentDir = Paths.get(BASE_DIR, userEmail, SENT_DIR);
+        if (Files.exists(sentDir)) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(sentDir, "Email_*.txt")) {
                 for (Path file : stream) {
                     Email email = readEmailFromFile(file);
                     if (email != null) {
@@ -111,35 +133,50 @@ public class EmailFileManager {
     }
 
     public static boolean deleteEmail(int emailId, String userEmail) throws IOException {
-        Path userDir = Paths.get(BASE_DIR, userEmail);
-        Path emailFile = userDir.resolve("Email_" + emailId + ".txt");
+        boolean deleted = false;
 
-        if (Files.exists(emailFile)) {
-            try {
-                Files.delete(emailFile);
-                return true;
-            } catch (IOException e) {
-                System.err.println("Errore durante l'eliminazione del file: " + e.getMessage());
-                return false;
-            }
+        // Prova a eliminare dalla cartella inbox
+        Path inboxFile = Paths.get(BASE_DIR, userEmail, INBOX_DIR, "Email_" + emailId + ".txt");
+        if (Files.exists(inboxFile)) {
+            Files.delete(inboxFile);
+            deleted = true;
         }
-        return false;
+
+        // Prova a eliminare dalla cartella sent
+        Path sentFile = Paths.get(BASE_DIR, userEmail, SENT_DIR, "Email_" + emailId + ".txt");
+        if (Files.exists(sentFile)) {
+            Files.delete(sentFile);
+            deleted = true;
+        }
+
+        return deleted;
     }
+
     public static void markEmailAsRead(int emailId, String userEmail) throws IOException {
-        Path userDir = Paths.get(BASE_DIR, userEmail);
-        Path filePath = userDir.resolve("Email_" + emailId + ".txt");
+        // Cerca l'email nella cartella inbox
+        Path inboxFile = Paths.get(BASE_DIR, userEmail, INBOX_DIR, "Email_" + emailId + ".txt");
+        if (Files.exists(inboxFile)) {
+            updateEmailReadStatus(inboxFile);
+        }
 
-        if (Files.exists(filePath)) {
-            List<String> lines = Files.readAllLines(filePath);
-            for (int i = 0; i < lines.size(); i++) {
-                if (lines.get(i).startsWith("Read:")) {
-                    lines.set(i, "Read: true");
-                    break;
-                }
-            }
-            Files.write(filePath, lines);
+        // Cerca l'email nella cartella sent
+        Path sentFile = Paths.get(BASE_DIR, userEmail, SENT_DIR, "Email_" + emailId + ".txt");
+        if (Files.exists(sentFile)) {
+            updateEmailReadStatus(sentFile);
         }
     }
+
+    private static void updateEmailReadStatus(Path filePath) throws IOException {
+        List<String> lines = Files.readAllLines(filePath);
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).startsWith("Read:")) {
+                lines.set(i, "Read: true");
+                break;
+            }
+        }
+        Files.write(filePath, lines);
+    }
+
     public static List<String> loadValidEmails() throws IOException {
         List<String> emails = new ArrayList<>();
         try (InputStream inputStream = EmailFileManager.class.getResourceAsStream("/emails.txt");

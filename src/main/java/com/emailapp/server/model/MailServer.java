@@ -61,10 +61,22 @@ public class MailServer {
                 recipients.forEach(this::createAccount);
             }
 
+            // Salva una copia dell'email nella cartella sent del mittente
+            int sentEmailId = EmailFileManager.getNextId();
+            Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
+            senderCopy.setId(sentEmailId);
+
+            try {
+                EmailFileManager.saveEmail(senderCopy, sender);
+            } catch (IOException e) {
+                serverController.logEvent("Errore durante il salvataggio dell'email inviata per " + sender + ": " + e.getMessage());
+            }
+
+            // Invia una copia dell'email a ciascun destinatario
             for (String recipient : recipients) {
-                int uniqueEmailId = EmailFileManager.getNextId();
-                Email recipientCopy = new Email(email.getSender(), email.getRecipients(), email.getSubject(), email.getBody());
-                recipientCopy.setId(uniqueEmailId);
+                int recipientEmailId = EmailFileManager.getNextId();
+                Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
+                recipientCopy.setId(recipientEmailId);
 
                 synchronized (accountLock) {
                     accounts.get(recipient).addToInbox(recipientCopy);
@@ -78,10 +90,6 @@ public class MailServer {
             }
         }
     }
-
-
-
-
 
     private Email createEmailCopy(Email original) {
         Email copy = new Email();

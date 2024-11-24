@@ -1,0 +1,7 @@
+Id: 6
+From: fabiodelia@progetto.com
+To: filippoditto@progetto.com
+Subject: ciao
+Date: 2024-11-24T15:50:57.497472200
+Read: false
+Body: Ciao
