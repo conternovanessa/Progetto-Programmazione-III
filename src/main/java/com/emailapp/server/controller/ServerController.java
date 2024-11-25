@@ -181,29 +181,31 @@ public class ServerController {
     private void handleWriteSocketRequest(Socket clientSocket) throws IOException, ClassNotFoundException {
         logEvent("📝 Ricevuta richiesta apertura socket di scrittura");
 
-        try (ServerSocket dedicatedServerSocket = new ServerSocket(0)) { // Porta automatica per la socket dedicata
-            int dedicatedPort = dedicatedServerSocket.getLocalPort();
-            logEvent("🔌 Creata socket dedicata sulla porta: " + dedicatedPort);
-            NetworkUtils.sendObject(clientSocket, dedicatedPort);
+        ServerSocket dedicatedServerSocket = new ServerSocket(0);
+        int dedicatedPort = dedicatedServerSocket.getLocalPort();
+        logEvent("🔌 Creata socket dedicata sulla porta: " + dedicatedPort);
+        NetworkUtils.sendObject(clientSocket, dedicatedPort);
 
-            try (Socket dedicatedSocket = dedicatedServerSocket.accept()) {
-                logEvent("✅ Connessione stabilita sulla socket dedicata");
+        Socket dedicatedSocket = dedicatedServerSocket.accept();
+        logEvent("✅ Connessione stabilita sulla socket dedicata");
 
-                Email newEmail = (Email) NetworkUtils.receiveObject(dedicatedSocket);
-                String senderEmail = (String) NetworkUtils.receiveObject(dedicatedSocket);
+        Email newEmail = (Email) NetworkUtils.receiveObject(dedicatedSocket);
+        String senderEmail = (String) NetworkUtils.receiveObject(dedicatedSocket);
 
-                try {
-                    mailServer.sendEmail(newEmail);
-                    NetworkUtils.sendObject(dedicatedSocket, "OK");
-                    logEvent("📧 Email processata e inviata con successo");
-                } catch (Exception e) {
-                    NetworkUtils.sendObject(dedicatedSocket, "ERROR: " + e.getMessage());
-                    logEvent("❌ Errore durante l'invio dell'email");
-                }
-            }
-            logEvent("🔒 Socket dedicata chiusa dopo l'invio");
+        try {
+            mailServer.sendEmail(newEmail);
+            NetworkUtils.sendObject(dedicatedSocket, "OK");
+            logEvent("📧 Email processata e inviata con successo");
+        } catch (Exception e) {
+            NetworkUtils.sendObject(dedicatedSocket, "ERROR: " + e.getMessage());
+            logEvent("❌ Errore durante l'invio dell'email");
         }
+
+        dedicatedSocket.close();
+        dedicatedServerSocket.close();
+        logEvent("🔒 Socket dedicata chiusa dopo l'invio");
     }
+
 
     private void handleCheckNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
