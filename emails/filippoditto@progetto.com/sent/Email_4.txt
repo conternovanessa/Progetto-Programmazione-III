@@ -1,7 +1,0 @@
-Id: 4
-From: filippoditto@progetto.com
-To: vanessaconterno@progetto.com
-Subject: ciao
-Date: 2024-11-24T15:50:30.388089300
-Read: false
-Body: hola
