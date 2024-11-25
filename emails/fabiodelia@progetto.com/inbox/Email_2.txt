@@ -1,7 +1,0 @@
-Id: 2
-From: vanessaconterno@progetto.com
-To: fabiodelia@progetto.com, filippoditto@progetto.com
-Subject: ehila
-Date: 2024-11-24T15:49:59.492054400
-Read: true
-Body: hola
