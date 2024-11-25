@@ -1,7 +1,0 @@
-Id: 12
-From: fabiodelia@progetto.com
-To: filippoditto@progetto.com
-Subject: sus
-Date: 2024-11-25T10:20:37.203479900
-Read: false
-Body: ses
