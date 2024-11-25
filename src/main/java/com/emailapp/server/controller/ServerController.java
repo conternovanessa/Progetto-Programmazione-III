@@ -15,6 +15,8 @@ import javafx.scene.control.Button;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -85,9 +87,12 @@ public class ServerController {
             }
 
             switch (command) {
+                case "REQUEST_WRITE_SOCKET":
+                    handleWriteSocketRequest(clientSocket);
+                    break;
+
                 case "CHECK_COMPOSE":
                     NetworkUtils.sendObject(clientSocket, "OK");
-                    logEvent("✅ Richiesta composizione nuova email");
                     break;
 
                 case "MARK_AS_READ":
@@ -96,10 +101,8 @@ public class ServerController {
                     try {
                         EmailFileManager.markEmailAsRead(emailId, userEmail);
                         NetworkUtils.sendObject(clientSocket, "OK");
-                        logEvent("📧 Email " + emailId + " marcata come letta da " + userEmail);
                     } catch (IOException e) {
                         NetworkUtils.sendObject(clientSocket, "ERROR");
-                        logEvent("❌ Errore nella marcatura dell'email " + emailId + " come letta");
                     }
                     break;
 
@@ -113,6 +116,10 @@ public class ServerController {
 
                 case "GET_FORWARD_TEMPLATE":
                     handleForwardTemplate(clientSocket, requestingUser);
+                    break;
+
+                case "VALIDATE_RECIPIENTS":
+                    handleValidateRecipients(clientSocket);
                     break;
 
                 case "SEND_EMAIL":
@@ -133,6 +140,10 @@ public class ServerController {
 
                 case "DELETE_EMAIL":
                     handleDeleteEmail(clientSocket, requestingUser);
+                    break;
+
+                case "CHECK_NEW_EMAILS":
+                    handleCheckNewEmails(clientSocket);
                     break;
 
                 case "FETCH_EMAILS":
@@ -166,6 +177,52 @@ public class ServerController {
                 command.equals("PREPARE_FORWARD") ||
                 command.equals("DELETE_EMAIL");
     }
+
+    private void handleWriteSocketRequest(Socket clientSocket) throws IOException, ClassNotFoundException {
+        logEvent("📝 Ricevuta richiesta apertura socket di scrittura");
+
+        try (ServerSocket dedicatedServerSocket = new ServerSocket(0)) { // Porta automatica per la socket dedicata
+            int dedicatedPort = dedicatedServerSocket.getLocalPort();
+            logEvent("🔌 Creata socket dedicata sulla porta: " + dedicatedPort);
+            NetworkUtils.sendObject(clientSocket, dedicatedPort);
+
+            try (Socket dedicatedSocket = dedicatedServerSocket.accept()) {
+                logEvent("✅ Connessione stabilita sulla socket dedicata");
+
+                Email newEmail = (Email) NetworkUtils.receiveObject(dedicatedSocket);
+                String senderEmail = (String) NetworkUtils.receiveObject(dedicatedSocket);
+
+                try {
+                    mailServer.sendEmail(newEmail);
+                    NetworkUtils.sendObject(dedicatedSocket, "OK");
+                    logEvent("📧 Email processata e inviata con successo");
+                } catch (Exception e) {
+                    NetworkUtils.sendObject(dedicatedSocket, "ERROR: " + e.getMessage());
+                    logEvent("❌ Errore durante l'invio dell'email");
+                }
+            }
+            logEvent("🔒 Socket dedicata chiusa dopo l'invio");
+        }
+    }
+
+    private void handleCheckNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
+        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
+        List<Email> newEmails = mailServer.retrieveQueuedEmails(recipient);
+        NetworkUtils.sendObject(clientSocket, newEmails);
+    }
+
+
+    private void handleEmailTransaction(Socket clientSocket) throws IOException {
+        try {
+            String command = (String) NetworkUtils.receiveObject(clientSocket);
+            if ("SEND_EMAIL".equals(command)) {
+                handleSendEmail(clientSocket);
+            }
+        } catch (ClassNotFoundException e) {
+            NetworkUtils.sendObject(clientSocket, "ERROR: Errore nella transazione");
+        }
+    }
+
 
     private void handleReplyTemplate(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
         int emailId = (int) NetworkUtils.receiveObject(clientSocket);
@@ -265,6 +322,25 @@ public class ServerController {
             logEvent("❌ Invio fallito da: " + senderEmail);
         }
     }
+
+    private void handleValidateRecipients(Socket clientSocket) throws IOException, ClassNotFoundException {
+        @SuppressWarnings("unchecked")
+        List<String> recipients = (List<String>) NetworkUtils.receiveObject(clientSocket);
+
+        try {
+            List<String> validEmails = Files.readAllLines(Paths.get("email.txt"));
+            boolean areValid = recipients.stream().allMatch(validEmails::contains);
+            NetworkUtils.sendObject(clientSocket, areValid ? "OK" : "ERROR");
+        } catch (IOException e) {
+            NetworkUtils.sendObject(clientSocket, "ERROR");
+            Platform.runLater(() ->
+                    showErrorAlert("Errore File",
+                            "Errore di Sistema",
+                            "Errore durante la lettura del file email.txt")
+            );
+        }
+    }
+
 
 
     private void handlePrepareReply(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {

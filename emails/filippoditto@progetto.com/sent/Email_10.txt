@@ -1,0 +1,7 @@
+Id: 10
+From: filippoditto@progetto.com
+To: fabiodelia@progetto.com
+Subject: sis
+Date: 2024-11-25T09:53:22.225535500
+Read: false
+Body: sus

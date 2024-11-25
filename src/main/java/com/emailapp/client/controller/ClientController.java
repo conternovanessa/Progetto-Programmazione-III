@@ -3,6 +3,7 @@ package com.emailapp.client.controller;
 import com.emailapp.util.NetworkUtils;
 import com.emailapp.client.model.Email;
 import com.emailapp.client.model.Mailbox;
+import javafx.animation.KeyFrame;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -14,6 +15,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
 import javafx.animation.Timeline;
+import javafx.util.Duration;
 
 import java.io.*;
 import java.net.Socket;
@@ -43,6 +45,7 @@ public class ClientController {
     private final ExecutorService executorService;
     private final BooleanProperty connectedProperty;
     private boolean isComposeViewVisible = false;
+    private static final int POLLING_INTERVAL = 1000;
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -56,7 +59,9 @@ public class ClientController {
         startConnectionChecker();
         setupEmailTableView();
         startEmailFetcher();
+        startPolling();
     }
+
 
     private void setupEmailTableView() {
         // Create and configure table columns
@@ -164,6 +169,19 @@ public class ClientController {
         });
     }
 
+    private boolean requestWriteSocket() {
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "REQUEST_WRITE_SOCKET");
+            String response = (String) NetworkUtils.receiveObject(socket);
+            return "SOCKET_GRANTED".equals(response);
+        } catch (Exception e) {
+            handleConnectionError();
+            return false;
+        }
+    }
+
+
+
     @FXML
     private void handleSendEmail() {
         if (!isConnected()) {
@@ -172,25 +190,37 @@ public class ClientController {
         }
 
         if (validateFields()) {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            // Il client invia solo la richiesta al server
+            try {
                 Email newEmail = createEmailFromFields();
+                // Inviamo la richiesta al server attraverso una socket di controllo
+                try (Socket controlSocket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                    NetworkUtils.sendObject(controlSocket, "REQUEST_WRITE_SOCKET");
+                    // Attendiamo che il server ci fornisca una porta dedicata per la comunicazione
+                    int dedicatedPort = (int) NetworkUtils.receiveObject(controlSocket);
+                    // Ci connettiamo alla porta dedicata fornita dal server
+                    try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
+                        // Procediamo con l'invio dell'email sulla socket dedicata
+                        NetworkUtils.sendObject(dedicatedSocket, newEmail);
+                        NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
 
-                NetworkUtils.sendObject(socket, "SEND_EMAIL");
-                NetworkUtils.sendObject(socket, newEmail);
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if ("OK".equals(response)) {
-                    showEmailListView();
-                    showInfoAlert("Email Inviata", "Email inviata con successo");
-                } else {
-                    showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
+                        String response = (String) NetworkUtils.receiveObject(dedicatedSocket);
+                        if ("OK".equals(response)) {
+                            showEmailListView();
+                            showInfoAlert("Email Inviata", "Email inviata con successo");
+                        } else {
+                            showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
+                        }
+                    }
                 }
             } catch (Exception e) {
                 handleConnectionError();
             }
         }
     }
+
+
+
 
     @FXML
     private void handleReplyEmail() {
@@ -341,6 +371,31 @@ public class ClientController {
         });
     }
 
+    private void startPolling() {
+        Timeline timeline = new Timeline(new KeyFrame(Duration.millis(POLLING_INTERVAL), e -> pollForNewEmails()));
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
+    }
+
+    private void pollForNewEmails() {
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "CHECK_NEW_EMAILS");
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+
+            List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
+            if (!newEmails.isEmpty()) {
+                Platform.runLater(() -> {
+                    newEmails.forEach(mailbox::addReceivedEmail);
+                    emailTableView.setItems(mailbox.getAllEmails());
+                    emailTableView.refresh();
+                });
+            }
+        } catch (Exception e) {
+            handleConnectionError();
+        }
+    }
+
+
 
     @FXML
     private void handleBackButton() {
@@ -376,19 +431,45 @@ public class ClientController {
     }
 
     private boolean validateFields() {
-        if (toField.getText().isEmpty()) {
-            showErrorAlert("Campo Mancante", "Inserire il destinatario");
+        // Controllo destinatario
+        String recipients = toField.getText();
+        if (recipients.isEmpty()) {
+            showErrorAlert("Campo Mancante", "Il campo 'A:' è obbligatorio");
             return false;
         }
+
+        // Controllo validità destinatari
+        List<String> recipientList = Arrays.asList(recipients.split("\\s*,\\s*"));
+        if (!validateRecipients(recipientList)) {
+            showErrorAlert("Destinatario non valido", "Uno o più destinatari non sono validi");
+            return false;
+        }
+
+        // Controllo oggetto
         if (subjectField.getText().isEmpty()) {
-            showErrorAlert("Campo Mancante", "Inserire l'oggetto");
+            showErrorAlert("Campo Mancante", "Il campo 'Oggetto' è obbligatorio");
             return false;
         }
+
+        // Controllo corpo
         if (bodyArea.getText().isEmpty()) {
-            showErrorAlert("Campo Mancante", "Inserire il testo dell'email");
+            showErrorAlert("Campo Mancante", "Il corpo dell'email è obbligatorio");
             return false;
         }
+
         return true;
+    }
+
+    private boolean validateRecipients(List<String> recipients) {
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            NetworkUtils.sendObject(socket, "VALIDATE_RECIPIENTS");
+            NetworkUtils.sendObject(socket, recipients);
+            String response = (String) NetworkUtils.receiveObject(socket);
+            return "OK".equals(response);
+        } catch (Exception e) {
+            handleConnectionError();
+            return false;
+        }
     }
 
 
@@ -417,10 +498,10 @@ public class ClientController {
 
     private Email createEmailFromFields() {
         Email email = new Email();
-        email.setSender(mailbox.getEmailAddress());
         email.setRecipients(Arrays.asList(toField.getText().split("\\s*,\\s*")));
         email.setSubject(subjectField.getText());
         email.setBody(bodyArea.getText());
+        email.setSender(mailbox.getEmailAddress());
         return email;
     }
 

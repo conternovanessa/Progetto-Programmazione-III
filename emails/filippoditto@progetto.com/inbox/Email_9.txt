@@ -1,7 +1,7 @@
-Id: 7
+Id: 9
 From: fabiodelia@progetto.com
 To: filippoditto@progetto.com
-Subject: ciao
-Date: 2024-11-24T15:50:57.497472200
+Subject: ses
+Date: 2024-11-25T09:50:27.537992500
 Read: true
-Body: Ciao
+Body: sis

@@ -4,16 +4,17 @@ import com.emailapp.client.model.Email;
 import com.emailapp.server.controller.ServerController;
 import com.emailapp.util.EmailFileManager;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 
 public class MailServer {
     private final Map<String, EmailAccount> accounts;
     private final ServerController serverController;
     private final Object accountLock = new Object();
     private final Object emailLock = new Object();
+    private Map<String, Queue<Email>> messageQueues = new ConcurrentHashMap<>();
 
     public MailServer(ServerController serverController) {
         this.accounts = new HashMap<>();
@@ -88,8 +89,12 @@ public class MailServer {
                     serverController.logEvent("Errore durante il salvataggio dell'email per " + recipient + ": " + e.getMessage());
                 }
             }
+
+            // Queue the email for recipients
+            queueEmail(email);
         }
     }
+
 
     private Email createEmailCopy(Email original) {
         Email copy = new Email();
@@ -123,6 +128,28 @@ public class MailServer {
                 return false;
             }
         }
+    }
+
+    public void queueEmail(Email email) {
+        for (String recipient : email.getRecipients()) {
+            messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
+                    .offer(email);
+        }
+
+    }
+
+    public List<Email> retrieveQueuedEmails(String recipient) {
+        Queue<Email> queue = messageQueues.get(recipient);
+        if (queue == null) {
+            return new ArrayList<>();
+        }
+
+        List<Email> emails = new ArrayList<>();
+        Email email;
+        while ((email = queue.poll()) != null) {
+            emails.add(email);
+        }
+        return emails;
     }
 
     public List<Email> getEmailsForUser(String recipient) {
