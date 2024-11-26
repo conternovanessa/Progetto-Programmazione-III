@@ -233,7 +233,7 @@ public class ClientController {
 
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if (response.startsWith("OK")) {
-                    // Riceve il template dal server
+                    // Cast esplicito per Email
                     Email replyTemplate = (Email) NetworkUtils.receiveObject(socket);
                     Platform.runLater(() -> {
                         showComposeView();
@@ -261,7 +261,7 @@ public class ClientController {
 
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if (response.startsWith("OK")) {
-                    // Riceve il template dal server
+                    // Cast esplicito per Email
                     Email replyAllTemplate = (Email) NetworkUtils.receiveObject(socket);
                     Platform.runLater(() -> {
                         showComposeView();
@@ -340,6 +340,7 @@ public class ClientController {
             NetworkUtils.sendObject(socket, "FETCH_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
+            // Aggiungi il cast esplicito con il tipo generico
             @SuppressWarnings("unchecked")
             List<Email> emails = (List<Email>) NetworkUtils.receiveObject(socket);
 
@@ -382,8 +383,11 @@ public class ClientController {
             NetworkUtils.sendObject(socket, "CHECK_NEW_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
+            // Aggiungi il cast esplicito con il tipo generico
+            @SuppressWarnings("unchecked")
             List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
-            if (!newEmails.isEmpty()) {
+
+            if (newEmails != null && !newEmails.isEmpty()) {
                 Platform.runLater(() -> {
                     newEmails.forEach(mailbox::addReceivedEmail);
                     emailTableView.setItems(mailbox.getAllEmails());
