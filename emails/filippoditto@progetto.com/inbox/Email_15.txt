@@ -1,0 +1,7 @@
+Id: 15
+From: vanessaconterno@progetto.com
+To: filippoditto@progetto.com
+Subject: via
+Date: 2024-11-25T10:32:53.500709900
+Read: true
+Body: daiu
