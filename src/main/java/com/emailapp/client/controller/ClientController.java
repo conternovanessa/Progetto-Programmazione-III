@@ -400,6 +400,8 @@ public class ClientController {
     @FXML
     private void handleBackButton() {
         showEmailListView();
+        actionButtons.setVisible(false);
+        emailDetailTextArea.setVisible(false);
     }
 
     private void showComposeView() {
