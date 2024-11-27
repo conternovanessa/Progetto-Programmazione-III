@@ -49,6 +49,7 @@ public class ClientController {
     private final BooleanProperty connectedProperty;
     private boolean isComposeViewVisible = false;
     private static final int POLLING_INTERVAL = 1000;
+    private Email currentDisplayedEmail;
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -210,29 +211,35 @@ public class ClientController {
 
     @FXML
     private void handleReplyEmail() {
-        Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
-        if (selectedEmail != null) {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "REPLY");
-                NetworkUtils.sendObject(socket, selectedEmail.getId());
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if (response.startsWith("OK")) {
-                    Email replyEmail = (Email) NetworkUtils.receiveObject(socket);
-                    Platform.runLater(() -> {
-                        showComposeView();
-                        toField.setText(replyEmail.getRecipients().get(0));
-                        subjectField.setText(replyEmail.getSubject());
-                        bodyArea.setText(replyEmail.getBody());
-                    });
-                } else {
-                    showErrorAlert("Errore", "Impossibile preparare la risposta: " + response);
-                }
-            } catch (Exception e) {
-                handleConnectionError();
-            }
+        if (currentDisplayedEmail == null) {
+            showErrorAlert("Nessuna Selezione", "Seleziona un'email per rispondere");
+            return;
         }
+
+        try {
+            Socket socket = new Socket("localhost", 5000);
+            NetworkUtils.sendObject(socket, "REPLY");
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+            NetworkUtils.sendObject(socket, currentDisplayedEmail.getId());
+
+            String response = (String) NetworkUtils.receiveObject(socket);
+            if ("OK".equals(response)) {
+                Email replyTemplate = (Email) NetworkUtils.receiveObject(socket);
+                replyTemplate.setSender(mailbox.getEmailAddress());
+                populateComposeFields(replyTemplate);
+                showComposeView();
+            } else {
+                showErrorAlert("Errore", "Impossibile creare la risposta");
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
+        }
+    }
+
+    private void populateComposeFields(Email replyTemplate) {
+        toField.setText(String.join(", ", replyTemplate.getRecipients()));
+        subjectField.setText(replyTemplate.getSubject());
+        bodyArea.setText(replyTemplate.getBody());
     }
 
     @FXML
@@ -342,6 +349,7 @@ public class ClientController {
 
     private void displayEmailDetails(Email email) {
         Platform.runLater(() -> {
+            currentDisplayedEmail = email; // Salva l'email corrente
             StringBuilder details = new StringBuilder();
             details.append("Da: ").append(email.getSender()).append("\n");
             details.append("A: ").append(String.join(", ", email.getRecipients())).append("\n");
@@ -355,7 +363,6 @@ public class ClientController {
             actionButtons.setVisible(true);
             composeView.setVisible(false);
 
-            // Make sure the detail view is in front
             if (!detailOrComposeStack.getChildren().contains(emailDetailTextArea)) {
                 detailOrComposeStack.getChildren().clear();
                 detailOrComposeStack.getChildren().add(emailDetailTextArea);

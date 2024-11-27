@@ -15,6 +15,7 @@ import javafx.scene.control.Button;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -196,18 +197,38 @@ public class ServerController {
         Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
 
         if (originalEmail == null) {
-            sendError(clientSocket, "Email non trovata o accesso negato");
+            NetworkUtils.sendObject(clientSocket, "ERROR");
+            logEvent("❌ Email non trovata per risposta: ID " + emailId);
             return;
         }
 
         Email replyEmail = new Email();
+        replyEmail.setSender(requestingUser);
         replyEmail.setRecipients(Collections.singletonList(originalEmail.getSender()));
         replyEmail.setSubject("Re: " + originalEmail.getSubject());
-        replyEmail.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        String formattedDate = originalEmail.getSentDate().format(formatter);
+
+        String replyBody = String.format("""
+        
+        
+        ----- Messaggio Originale -----
+        Da: %s
+        Data: %s
+        Oggetto: %s
+        
+        %s""",
+                originalEmail.getSender(),
+                formattedDate,
+                originalEmail.getSubject(),
+                originalEmail.getBody());
+
+        replyEmail.setBody(replyBody);
 
         NetworkUtils.sendObject(clientSocket, "OK");
         NetworkUtils.sendObject(clientSocket, replyEmail);
-        logEvent("📧 Creata risposta per email: " + emailId);
+        logEvent("📧 Template risposta creato per email: " + emailId);
     }
 
     private void handleReplyAll(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
