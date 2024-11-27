@@ -366,9 +366,17 @@ public class ClientController {
             details.append(email.getBody());
 
             emailDetailTextArea.setText(details.toString());
+            emailDetailTextArea.setVisible(true);
             emailDetailFlow.setVisible(true);
             emailTableView.setVisible(false);
             actionButtons.setVisible(true);
+            composeView.setVisible(false);
+
+            // Make sure the detail view is in front
+            if (!detailOrComposeStack.getChildren().contains(emailDetailTextArea)) {
+                detailOrComposeStack.getChildren().clear();
+                detailOrComposeStack.getChildren().add(emailDetailTextArea);
+            }
         });
     }
 
@@ -403,9 +411,19 @@ public class ClientController {
 
     @FXML
     private void handleBackButton() {
-        showEmailListView();
-        actionButtons.setVisible(false);
-        emailDetailTextArea.setVisible(false);
+        Platform.runLater(() -> {
+            emailTableView.setVisible(true);
+            emailDetailFlow.setVisible(false);
+            emailDetailTextArea.setVisible(false);
+            actionButtons.setVisible(false);
+            composeView.setVisible(false);
+
+            // Clear selection to allow reselecting the same email
+            emailTableView.getSelectionModel().clearSelection();
+
+            // Refresh the email list
+            refreshEmailList();
+        });
     }
 
     private void showComposeView() {
@@ -421,11 +439,18 @@ public class ClientController {
     }
 
     private void showEmailListView() {
-        isComposeViewVisible = false;
-        composeView.setVisible(false);
-        emailDetailFlow.setVisible(false);
-        emailTableView.setVisible(true);
-        refreshEmailList();
+        Platform.runLater(() -> {
+            isComposeViewVisible = false;
+            composeView.setVisible(false);
+            emailDetailFlow.setVisible(false);
+            emailDetailTextArea.setVisible(false);
+            emailTableView.setVisible(true);
+            actionButtons.setVisible(false);
+
+            // Clear selection and refresh
+            emailTableView.getSelectionModel().clearSelection();
+            refreshEmailList();
+        });
     }
 
     private void refreshEmailList() {

@@ -3,5 +3,5 @@ From: fabiodelia@progetto.com
 To: filippoditto@progetto.com
 Subject: btefe
 Date: 2024-11-26T09:25:31.899591500
-Read: false
+Read: true
 Body: btrsbe
