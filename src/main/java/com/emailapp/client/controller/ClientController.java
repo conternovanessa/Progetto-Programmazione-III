@@ -19,10 +19,13 @@ import javafx.util.Duration;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class ClientController {
     private static final String SERVER_ADDRESS = "localhost";
@@ -462,28 +465,56 @@ public class ClientController {
     }
 
     private boolean validateFields() {
-        // Controllo destinatario
-        String recipients = toField.getText();
+        String recipients = toField.getText().trim();
         if (recipients.isEmpty()) {
             showErrorAlert("Campo Mancante", "Il campo 'A:' è obbligatorio");
             return false;
         }
 
-        // Controllo validità destinatari
         List<String> recipientList = Arrays.asList(recipients.split("\\s*,\\s*"));
-        if (!validateRecipients(recipientList)) {
-            showErrorAlert("Destinatario non valido", "Uno o più destinatari non sono validi");
-            return false;
+        for (String recipient : recipientList) {
+            // Case 1: Check for @ symbol
+            if (!recipient.contains("@")) {
+                showErrorAlert("Formato Email Non Valido",
+                        "L'indirizzo email '" + recipient + "' non contiene il simbolo @");
+                return false;
+            }
+
+            String[] parts = recipient.split("@");
+            String username = parts[0];
+            String domain = parts[1];
+
+            // Case 2: Check domain
+            if (!"progetto.com".equals(domain)) {
+                showErrorAlert("Dominio Non Valido",
+                        "Il dominio deve essere 'progetto.com'. Dominio inserito: '" + domain + "'");
+                return false;
+            }
+
+            // Case 3: Check username against emails.txt
+            try {
+                List<String> validUsernames = Files.readAllLines(Paths.get("email.txt"))
+                        .stream()
+                        .map(email -> email.split("@")[0])
+                        .collect(Collectors.toList());
+
+                if (!validUsernames.contains(username)) {
+                    showErrorAlert("Username Non Valido",
+                            "L'username '" + username + "' non è presente nel sistema");
+                    return false;
+                }
+            } catch (IOException e) {
+                showErrorAlert("Errore Sistema", "Impossibile verificare l'username");
+                return false;
+            }
         }
 
-        // Controllo oggetto
-        if (subjectField.getText().isEmpty()) {
+        if (subjectField.getText().trim().isEmpty()) {
             showErrorAlert("Campo Mancante", "Il campo 'Oggetto' è obbligatorio");
             return false;
         }
 
-        // Controllo corpo
-        if (bodyArea.getText().isEmpty()) {
+        if (bodyArea.getText().trim().isEmpty()) {
             showErrorAlert("Campo Mancante", "Il corpo dell'email è obbligatorio");
             return false;
         }
@@ -496,13 +527,40 @@ public class ClientController {
             NetworkUtils.sendObject(socket, "VALIDATE_RECIPIENTS");
             NetworkUtils.sendObject(socket, recipients);
             String response = (String) NetworkUtils.receiveObject(socket);
-            return "OK".equals(response);
+
+            if (!"OK".equals(response)) {
+                // Create a list of invalid recipients
+                StringBuilder invalidRecipients = new StringBuilder();
+                for (String recipient : recipients) {
+                    if (!isValidEmailInSystem(recipient)) {
+                        if (invalidRecipients.length() > 0) {
+                            invalidRecipients.append(", ");
+                        }
+                        invalidRecipients.append(recipient);
+                    }
+                }
+
+                showErrorAlert("Destinatario Non Valido",
+                        "I seguenti indirizzi email non sono registrati nel sistema:\n" +
+                                invalidRecipients.toString());
+                return false;
+            }
+            return true;
         } catch (Exception e) {
             handleConnectionError();
             return false;
         }
     }
 
+    private boolean isValidEmailInSystem(String email) {
+        try {
+            List<String> validEmails = Files.readAllLines(Paths.get("email.txt"));
+            return validEmails.contains(email);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 
     public void checkConnection() {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
