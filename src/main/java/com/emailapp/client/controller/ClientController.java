@@ -65,7 +65,6 @@ public class ClientController {
         startPolling();
     }
 
-
     private void setupEmailTableView() {
         // Create and configure table columns
         TableColumn<Email, String> senderColumn = new TableColumn<>("From");
@@ -89,6 +88,7 @@ public class ClientController {
             }
         });
     }
+
     private void startEmailFetcher() {
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
@@ -127,7 +127,6 @@ public class ClientController {
             showErrorAlert("Errore di connessione", "Impossibile contattare il server");
         }
     }
-
 
     private void setupConnectionListener() {
         connectedProperty.addListener((observable, oldValue, newValue) -> {
@@ -172,19 +171,6 @@ public class ClientController {
         });
     }
 
-    private boolean requestWriteSocket() {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "REQUEST_WRITE_SOCKET");
-            String response = (String) NetworkUtils.receiveObject(socket);
-            return "SOCKET_GRANTED".equals(response);
-        } catch (Exception e) {
-            handleConnectionError();
-            return false;
-        }
-    }
-
-
-
     @FXML
     private void handleSendEmail() {
         if (!isConnected()) {
@@ -222,27 +208,23 @@ public class ClientController {
         }
     }
 
-
-
-
     @FXML
     private void handleReplyEmail() {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "GET_REPLY_TEMPLATE");
+                NetworkUtils.sendObject(socket, "REPLY");
                 NetworkUtils.sendObject(socket, selectedEmail.getId());
                 NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if (response.startsWith("OK")) {
-                    // Cast esplicito per Email
-                    Email replyTemplate = (Email) NetworkUtils.receiveObject(socket);
+                    Email replyEmail = (Email) NetworkUtils.receiveObject(socket);
                     Platform.runLater(() -> {
                         showComposeView();
-                        toField.setText(replyTemplate.getRecipients().get(0));
-                        subjectField.setText(replyTemplate.getSubject());
-                        bodyArea.setText(replyTemplate.getBody());
+                        toField.setText(replyEmail.getRecipients().get(0));
+                        subjectField.setText(replyEmail.getSubject());
+                        bodyArea.setText(replyEmail.getBody());
                     });
                 } else {
                     showErrorAlert("Errore", "Impossibile preparare la risposta: " + response);
@@ -258,19 +240,18 @@ public class ClientController {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "GET_REPLY_ALL_TEMPLATE");
+                NetworkUtils.sendObject(socket, "REPLY_ALL");
                 NetworkUtils.sendObject(socket, selectedEmail.getId());
                 NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if (response.startsWith("OK")) {
-                    // Cast esplicito per Email
-                    Email replyAllTemplate = (Email) NetworkUtils.receiveObject(socket);
+                    Email replyAllEmail = (Email) NetworkUtils.receiveObject(socket);
                     Platform.runLater(() -> {
                         showComposeView();
-                        toField.setText(String.join(", ", replyAllTemplate.getRecipients()));
-                        subjectField.setText(replyAllTemplate.getSubject());
-                        bodyArea.setText(replyAllTemplate.getBody());
+                        toField.setText(String.join(", ", replyAllEmail.getRecipients()));
+                        subjectField.setText(replyAllEmail.getSubject());
+                        bodyArea.setText(replyAllEmail.getBody());
                     });
                 } else {
                     showErrorAlert("Errore", "Impossibile preparare la risposta a tutti: " + response);
@@ -286,19 +267,18 @@ public class ClientController {
         Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
         if (selectedEmail != null) {
             try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "GET_FORWARD_TEMPLATE");
+                NetworkUtils.sendObject(socket, "FORWARD");
                 NetworkUtils.sendObject(socket, selectedEmail.getId());
                 NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
                 String response = (String) NetworkUtils.receiveObject(socket);
                 if (response.startsWith("OK")) {
-                    // Riceve il template dal server
-                    Email forwardTemplate = (Email) NetworkUtils.receiveObject(socket);
+                    Email forwardEmail = (Email) NetworkUtils.receiveObject(socket);
                     Platform.runLater(() -> {
                         showComposeView();
-                        toField.clear(); // Il destinatario deve essere inserito dall'utente
-                        subjectField.setText(forwardTemplate.getSubject());
-                        bodyArea.setText(forwardTemplate.getBody());
+                        toField.clear();
+                        subjectField.setText(forwardEmail.getSubject());
+                        bodyArea.setText(forwardEmail.getBody());
                     });
                 } else {
                     showErrorAlert("Errore", "Impossibile preparare l'inoltro: " + response);
@@ -410,8 +390,6 @@ public class ClientController {
         }
     }
 
-
-
     @FXML
     private void handleBackButton() {
         Platform.runLater(() -> {
@@ -522,36 +500,6 @@ public class ClientController {
         return true;
     }
 
-    private boolean validateRecipients(List<String> recipients) {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "VALIDATE_RECIPIENTS");
-            NetworkUtils.sendObject(socket, recipients);
-            String response = (String) NetworkUtils.receiveObject(socket);
-
-            if (!"OK".equals(response)) {
-                // Create a list of invalid recipients
-                StringBuilder invalidRecipients = new StringBuilder();
-                for (String recipient : recipients) {
-                    if (!isValidEmailInSystem(recipient)) {
-                        if (invalidRecipients.length() > 0) {
-                            invalidRecipients.append(", ");
-                        }
-                        invalidRecipients.append(recipient);
-                    }
-                }
-
-                showErrorAlert("Destinatario Non Valido",
-                        "I seguenti indirizzi email non sono registrati nel sistema:\n" +
-                                invalidRecipients.toString());
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            handleConnectionError();
-            return false;
-        }
-    }
-
     private boolean isValidEmailInSystem(String email) {
         try {
             List<String> validEmails = Files.readAllLines(Paths.get("email.txt"));
@@ -598,13 +546,6 @@ public class ClientController {
         toField.clear();
         subjectField.clear();
         bodyArea.clear();
-    }
-
-    private void prepareReplyEmail(Email originalEmail) {
-        showComposeView();
-        toField.setText(originalEmail.getSender());
-        subjectField.setText("Re: " + originalEmail.getSubject());
-        bodyArea.setText("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
     }
 
     private void handleConnectionError() {

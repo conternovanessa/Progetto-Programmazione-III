@@ -15,8 +15,6 @@ import javafx.scene.control.Button;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -106,36 +104,20 @@ public class ServerController {
                     }
                     break;
 
-                case "GET_REPLY_TEMPLATE":
-                    handleReplyTemplate(clientSocket, requestingUser);
-                    break;
-
-                case "GET_REPLY_ALL_TEMPLATE":
-                    handleReplyAllTemplate(clientSocket, requestingUser);
-                    break;
-
-                case "GET_FORWARD_TEMPLATE":
-                    handleForwardTemplate(clientSocket, requestingUser);
-                    break;
-
-                case "VALIDATE_RECIPIENTS":
-                    handleValidateRecipients(clientSocket);
-                    break;
-
                 case "SEND_EMAIL":
                     handleSendEmail(clientSocket);
                     break;
 
-                case "PREPARE_REPLY":
-                    handlePrepareReply(clientSocket, requestingUser);
+                case "REPLY":
+                    handleReply(clientSocket, requestingUser);
                     break;
 
-                case "PREPARE_REPLY_ALL":
-                    handlePrepareReplyAll(clientSocket, requestingUser);
+                case "REPLY_ALL":
+                    handleReplyAll(clientSocket, requestingUser);
                     break;
 
-                case "PREPARE_FORWARD":
-                    handlePrepareForward(clientSocket, requestingUser);
+                case "FORWARD":
+                    handleForward(clientSocket, requestingUser);
                     break;
 
                 case "DELETE_EMAIL":
@@ -169,12 +151,9 @@ public class ServerController {
     }
 
     private boolean requiresRequestingUser(String command) {
-        return command.equals("GET_REPLY_TEMPLATE") ||
-                command.equals("GET_REPLY_ALL_TEMPLATE") ||
-                command.equals("GET_FORWARD_TEMPLATE") ||
-                command.equals("PREPARE_REPLY") ||
-                command.equals("PREPARE_REPLY_ALL") ||
-                command.equals("PREPARE_FORWARD") ||
+        return command.equals("REPLY") ||
+                command.equals("REPLY_ALL") ||
+                command.equals("FORWARD") ||
                 command.equals("DELETE_EMAIL");
     }
 
@@ -206,108 +185,82 @@ public class ServerController {
         logEvent("🔒 Socket dedicata chiusa dopo l'invio");
     }
 
-
     private void handleCheckNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
         List<Email> newEmails = mailServer.retrieveQueuedEmails(recipient);
         NetworkUtils.sendObject(clientSocket, newEmails);
     }
 
-
-    private void handleEmailTransaction(Socket clientSocket) throws IOException {
-        try {
-            String command = (String) NetworkUtils.receiveObject(clientSocket);
-            if ("SEND_EMAIL".equals(command)) {
-                handleSendEmail(clientSocket);
-            }
-        } catch (ClassNotFoundException e) {
-            NetworkUtils.sendObject(clientSocket, "ERROR: Errore nella transazione");
-        }
-    }
-
-
-    private void handleReplyTemplate(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
+    private void handleReply(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
         int emailId = (int) NetworkUtils.receiveObject(clientSocket);
-
         Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
+
         if (originalEmail == null) {
             sendError(clientSocket, "Email non trovata o accesso negato");
             return;
         }
 
-        Email replyTemplate = createReplyTemplate(originalEmail);
+        Email replyEmail = new Email();
+        replyEmail.setRecipients(Collections.singletonList(originalEmail.getSender()));
+        replyEmail.setSubject("Re: " + originalEmail.getSubject());
+        replyEmail.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
+
         NetworkUtils.sendObject(clientSocket, "OK");
-        NetworkUtils.sendObject(clientSocket, replyTemplate);
-        logEvent("📧 Template risposta creato per email: " + emailId);
+        NetworkUtils.sendObject(clientSocket, replyEmail);
+        logEvent("📧 Creata risposta per email: " + emailId);
     }
 
-    private void handleReplyAllTemplate(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
+    private void handleReplyAll(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
         int emailId = (int) NetworkUtils.receiveObject(clientSocket);
-
         Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
+
         if (originalEmail == null) {
             sendError(clientSocket, "Email non trovata o accesso negato");
             return;
         }
 
-        Email replyAllTemplate = createReplyAllTemplate(originalEmail, requestingUser);
-        NetworkUtils.sendObject(clientSocket, "OK");
-        NetworkUtils.sendObject(clientSocket, replyAllTemplate);
-        logEvent("📧 Template risposta a tutti creato per email: " + emailId);
-    }
-
-    private void handleForwardTemplate(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
-
-        Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
-        if (originalEmail == null) {
-            sendError(clientSocket, "Email non trovata o accesso negato");
-            return;
-        }
-
-        Email forwardTemplate = createForwardTemplate(originalEmail);
-        NetworkUtils.sendObject(clientSocket, "OK");
-        NetworkUtils.sendObject(clientSocket, forwardTemplate);
-        logEvent("📧 Template inoltro creato per email: " + emailId);
-    }
-
-    private Email createReplyTemplate(Email originalEmail) {
-        Email template = new Email();
-        template.setRecipients(Collections.singletonList(originalEmail.getSender()));
-        template.setSubject("Re: " + originalEmail.getSubject());
-        template.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
-        return template;
-    }
-
-    private Email createReplyAllTemplate(Email originalEmail, String requestingUser) {
         Set<String> recipients = new HashSet<>(originalEmail.getRecipients());
         recipients.add(originalEmail.getSender());
         recipients.remove(requestingUser);
 
-        Email template = new Email();
-        template.setRecipients(new ArrayList<>(recipients));
-        template.setSubject("Re: " + originalEmail.getSubject());
-        template.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
-        return template;
+        Email replyAllEmail = new Email();
+        replyAllEmail.setRecipients(new ArrayList<>(recipients));
+        replyAllEmail.setSubject("Re: " + originalEmail.getSubject());
+        replyAllEmail.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
+
+        NetworkUtils.sendObject(clientSocket, "OK");
+        NetworkUtils.sendObject(clientSocket, replyAllEmail);
+        logEvent("📧 Creata risposta a tutti per email: " + emailId);
     }
 
-    private Email createForwardTemplate(Email originalEmail) {
-        Email template = new Email();
-        template.setSubject("Fwd: " + originalEmail.getSubject());
+    private void handleForward(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
+        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+        Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
+
+        if (originalEmail == null) {
+            sendError(clientSocket, "Email non trovata o accesso negato");
+            return;
+        }
+
+        Email forwardEmail = new Email();
+        forwardEmail.setSubject("Fwd: " + originalEmail.getSubject());
         String forwardedContent = String.format("""
-            
-            ----- Messaggio Inoltrato -----
-            Da: %s
-            A: %s
-            Oggetto: %s
-            
-            %s""",
+        
+        ----- Messaggio Inoltrato -----
+        Da: %s
+        A: %s
+        Oggetto: %s
+        
+        %s""",
                 originalEmail.getSender(),
                 String.join(", ", originalEmail.getRecipients()),
                 originalEmail.getSubject(),
                 originalEmail.getBody());
-        template.setBody(forwardedContent);
-        return template;
+        forwardEmail.setBody(forwardedContent);
+
+        NetworkUtils.sendObject(clientSocket, "OK");
+        NetworkUtils.sendObject(clientSocket, forwardEmail);
+        logEvent("📧 Creato inoltro per email: " + emailId);
     }
 
     private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
@@ -323,53 +276,6 @@ public class ServerController {
             NetworkUtils.sendObject(clientSocket, "ERROR: " + e.getMessage());
             logEvent("❌ Invio fallito da: " + senderEmail);
         }
-    }
-
-    private void handleValidateRecipients(Socket clientSocket) throws IOException, ClassNotFoundException {
-        @SuppressWarnings("unchecked")
-        List<String> recipients = (List<String>) NetworkUtils.receiveObject(clientSocket);
-
-        try {
-            List<String> validEmails = Files.readAllLines(Paths.get("email.txt"));
-            boolean areValid = recipients.stream().allMatch(validEmails::contains);
-            NetworkUtils.sendObject(clientSocket, areValid ? "OK" : "ERROR");
-        } catch (IOException e) {
-            NetworkUtils.sendObject(clientSocket, "ERROR");
-            Platform.runLater(() ->
-                    showErrorAlert("Errore File",
-                            "Errore di Sistema",
-                            "Errore durante la lettura del file email.txt")
-            );
-        }
-    }
-
-
-
-    private void handlePrepareReply(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
-        Email email = mailServer.getEmailById(emailId, requestingUser);
-        NetworkUtils.sendObject(clientSocket, email != null ? "OK" : "ERROR");
-        logEvent(email != null ?
-                "🔄 Preparazione risposta per email: " + emailId :
-                "❌ Accesso negato alla preparazione risposta per email: " + emailId);
-    }
-
-    private void handlePrepareReplyAll(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
-        Email email = mailServer.getEmailById(emailId, requestingUser);
-        NetworkUtils.sendObject(clientSocket, email != null ? "OK" : "ERROR");
-        logEvent(email != null ?
-                "🔄 Preparazione risposta a tutti per email: " + emailId :
-                "❌ Accesso negato alla preparazione risposta a tutti per email: " + emailId);
-    }
-
-    private void handlePrepareForward(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
-        Email email = mailServer.getEmailById(emailId, requestingUser);
-        NetworkUtils.sendObject(clientSocket, email != null ? "OK" : "ERROR");
-        logEvent(email != null ?
-                "↪ Preparazione inoltro per email: " + emailId :
-                "❌ Accesso negato alla preparazione inoltro per email: " + emailId);
     }
 
     private void handleDeleteEmail(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
