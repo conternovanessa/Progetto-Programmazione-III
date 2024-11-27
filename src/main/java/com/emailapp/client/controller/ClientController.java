@@ -236,63 +236,70 @@ public class ClientController {
         }
     }
 
-    private void populateComposeFields(Email replyTemplate) {
-        toField.setText(String.join(", ", replyTemplate.getRecipients()));
-        subjectField.setText(replyTemplate.getSubject());
-        bodyArea.setText(replyTemplate.getBody());
+    private void populateComposeFields(Email email) {
+        // Clear fields first
+        toField.clear();
+        subjectField.setText(email.getSubject() != null ? email.getSubject() : "");
+
+        // For forward, we don't want to populate recipients
+        if (email.getRecipients() != null && !email.getRecipients().isEmpty()) {
+            toField.setText(String.join(", ", email.getRecipients()));
+        }
+
+        bodyArea.setText(email.getBody() != null ? email.getBody() : "");
     }
 
     @FXML
     private void handleReplyAllEmail() {
-        Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
-        if (selectedEmail != null) {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "REPLY_ALL");
-                NetworkUtils.sendObject(socket, selectedEmail.getId());
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+        if (currentDisplayedEmail == null) {
+            showErrorAlert("Nessuna Selezione", "Seleziona un'email per rispondere a tutti");
+            return;
+        }
 
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if (response.startsWith("OK")) {
-                    Email replyAllEmail = (Email) NetworkUtils.receiveObject(socket);
-                    Platform.runLater(() -> {
-                        showComposeView();
-                        toField.setText(String.join(", ", replyAllEmail.getRecipients()));
-                        subjectField.setText(replyAllEmail.getSubject());
-                        bodyArea.setText(replyAllEmail.getBody());
-                    });
-                } else {
-                    showErrorAlert("Errore", "Impossibile preparare la risposta a tutti: " + response);
-                }
-            } catch (Exception e) {
-                handleConnectionError();
+        try {
+            Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            NetworkUtils.sendObject(socket, "REPLY_ALL");
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+            NetworkUtils.sendObject(socket, currentDisplayedEmail.getId());
+
+            String response = (String) NetworkUtils.receiveObject(socket);
+            if ("OK".equals(response)) {
+                Email replyAllTemplate = (Email) NetworkUtils.receiveObject(socket);
+                replyAllTemplate.setSender(mailbox.getEmailAddress());
+                populateComposeFields(replyAllTemplate);
+                showComposeView();
+            } else {
+                showErrorAlert("Errore", "Impossibile creare la risposta a tutti");
             }
+        } catch (IOException | ClassNotFoundException e) {
+            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
         }
     }
 
     @FXML
     private void handleForwardEmail() {
-        Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
-        if (selectedEmail != null) {
-            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                NetworkUtils.sendObject(socket, "FORWARD");
-                NetworkUtils.sendObject(socket, selectedEmail.getId());
-                NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+        if (currentDisplayedEmail == null) {
+            showErrorAlert("Nessuna Selezione", "Seleziona un'email da inoltrare");
+            return;
+        }
 
-                String response = (String) NetworkUtils.receiveObject(socket);
-                if (response.startsWith("OK")) {
-                    Email forwardEmail = (Email) NetworkUtils.receiveObject(socket);
-                    Platform.runLater(() -> {
-                        showComposeView();
-                        toField.clear();
-                        subjectField.setText(forwardEmail.getSubject());
-                        bodyArea.setText(forwardEmail.getBody());
-                    });
-                } else {
-                    showErrorAlert("Errore", "Impossibile preparare l'inoltro: " + response);
-                }
-            } catch (Exception e) {
-                handleConnectionError();
+        try {
+            Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            NetworkUtils.sendObject(socket, "FORWARD");
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+            NetworkUtils.sendObject(socket, currentDisplayedEmail.getId());
+
+            String response = (String) NetworkUtils.receiveObject(socket);
+            if ("OK".equals(response)) {
+                Email forwardTemplate = (Email) NetworkUtils.receiveObject(socket);
+                forwardTemplate.setSender(mailbox.getEmailAddress());
+                populateComposeFields(forwardTemplate);
+                showComposeView();
+            } else {
+                showErrorAlert("Errore", "Impossibile creare l'inoltro");
             }
+        } catch (IOException | ClassNotFoundException e) {
+            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
         }
     }
 
