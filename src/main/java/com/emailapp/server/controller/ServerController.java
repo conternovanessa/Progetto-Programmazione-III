@@ -193,7 +193,7 @@ public class ServerController {
     }
 
     private void handleReply(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+       try{ int emailId = (int) NetworkUtils.receiveObject(clientSocket);
         Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
 
         if (originalEmail == null) {
@@ -229,10 +229,13 @@ public class ServerController {
         NetworkUtils.sendObject(clientSocket, "OK");
         NetworkUtils.sendObject(clientSocket, replyEmail);
         logEvent("📧 Template risposta creato per email: " + emailId);
+        } finally {
+        closeClientSocket(clientSocket);
+        }
     }
 
     private void handleReplyAll(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+        try{int emailId = (int) NetworkUtils.receiveObject(clientSocket);
         Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
 
         if (originalEmail == null) {
@@ -252,10 +255,14 @@ public class ServerController {
         NetworkUtils.sendObject(clientSocket, "OK");
         NetworkUtils.sendObject(clientSocket, replyAllEmail);
         logEvent("📧 Creata risposta a tutti per email: " + emailId);
+        } finally {
+            closeClientSocket(clientSocket);
+        }
     }
 
     private void handleForward(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+        try{
+            int emailId = (int) NetworkUtils.receiveObject(clientSocket);
         Email originalEmail = mailServer.getEmailById(emailId, requestingUser);
 
         if (originalEmail == null) {
@@ -282,6 +289,9 @@ public class ServerController {
         NetworkUtils.sendObject(clientSocket, "OK");
         NetworkUtils.sendObject(clientSocket, forwardEmail);
         logEvent("📧 Creato inoltro per email: " + emailId);
+        } finally {
+            closeClientSocket(clientSocket);
+        }
     }
 
     private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
