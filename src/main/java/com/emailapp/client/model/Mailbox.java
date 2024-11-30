@@ -1,5 +1,6 @@
 package com.emailapp.client.model;
 
+import com.emailapp.util.NetworkUtils;
 import com.emailapp.util.EmailFileManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -28,6 +29,32 @@ public class Mailbox {
         this.executorService = Executors.newCachedThreadPool();
     }
 
+    public synchronized void loadEmailsFromServer() {
+        executorService.submit(() -> {
+            try {
+                List<Email> allEmails = NetworkUtils.fetchEmails(SERVER_ADDRESS, SERVER_PORT, emailAddress);
+
+                Platform.runLater(() -> {
+                    synchronized (lock) {
+                        clearAllEmails();
+                        for (Email email : allEmails) {
+                            if (email.getSender().equals(emailAddress)) {
+                                sentEmails.add(email);
+                            } else {
+                                receivedEmails.add(email);
+                            }
+                        }
+                        if (emailLoadedCallback != null) {
+                            emailLoadedCallback.run();
+                        }
+                    }
+                });
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
     public synchronized void loadEmailsFromDisk() {
         executorService.submit(() -> {
             try {
@@ -36,7 +63,11 @@ public class Mailbox {
                     synchronized (lock) {
                         clearAllEmails();
                         for (Email email : loadedEmails) {
-                            addReceivedEmail(email);
+                            if (email.getSender().equals(emailAddress)) {
+                                sentEmails.add(email);
+                            } else {
+                                receivedEmails.add(email);
+                            }
                         }
                         if (emailLoadedCallback != null) {
                             emailLoadedCallback.run();
@@ -46,6 +77,22 @@ public class Mailbox {
             } catch (IOException e) {
                 e.printStackTrace();
                 System.err.println("Errore nel caricamento dei file:" + e.getMessage());
+            }
+        });
+    }
+
+    public synchronized void addNewEmail(Email email) {
+        Platform.runLater(() -> {
+            synchronized (lock) {
+                if (email.getSender().equals(emailAddress)) {
+                    if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
+                        sentEmails.add(email);
+                    }
+                } else {
+                    if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
+                        receivedEmails.add(email);
+                    }
+                }
             }
         });
     }

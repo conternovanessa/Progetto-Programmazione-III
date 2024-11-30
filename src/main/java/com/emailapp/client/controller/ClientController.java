@@ -43,6 +43,7 @@ public class ClientController {
     @FXML private Button sendButton;
     @FXML private HBox actionButtons;
     @FXML private TextArea emailDetailTextArea;
+    @FXML private ComboBox<String> emailFilterComboBox;
 
     private final Mailbox mailbox;
     private final ExecutorService executorService;
@@ -50,6 +51,7 @@ public class ClientController {
     private boolean isComposeViewVisible = false;
     private static final int POLLING_INTERVAL = 1000;
     private Email currentDisplayedEmail;
+    private String currentFilter = "Email ricevute";
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -62,8 +64,52 @@ public class ClientController {
         setupConnectionListener();
         startConnectionChecker();
         setupEmailTableView();
+        setupEmailFilter();
         startEmailFetcher();
         startPolling();
+    }
+
+    private void setupEmailFilter() {
+        emailFilterComboBox.getItems().addAll("Email ricevute", "Email inviate");
+        emailFilterComboBox.setValue(currentFilter);
+
+        emailFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                currentFilter = newVal;
+                filterEmails(newVal);
+            }
+        });
+    }
+
+    private void filterEmails(String filter) {
+        if (!isConnected()) {
+            showErrorAlert("Server Disconnesso", "Impossibile filtrare le email: server non raggiungibile");
+            return;
+        }
+
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            String command = filter.equals("Email inviate") ? "FETCH_SENT_EMAILS" : "FETCH_RECEIVED_EMAILS";
+            NetworkUtils.sendObject(socket, command);
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+
+            @SuppressWarnings("unchecked")
+            List<Email> emails = (List<Email>) NetworkUtils.receiveObject(socket);
+
+            Platform.runLater(() -> {
+                mailbox.clearEmails();
+                if (emails != null) {
+                    if (filter.equals("Email inviate")) {
+                        emails.forEach(mailbox::addSentEmail);
+                    } else {
+                        emails.forEach(mailbox::addReceivedEmail);
+                    }
+                    emailTableView.setItems(mailbox.getAllEmails());
+                    emailTableView.refresh();
+                }
+            });
+        } catch (Exception e) {
+            handleConnectionError();
+        }
     }
 
     private void setupEmailTableView() {
@@ -388,15 +434,26 @@ public class ClientController {
             NetworkUtils.sendObject(socket, "CHECK_NEW_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
-            // Aggiungi il cast esplicito con il tipo generico
             @SuppressWarnings("unchecked")
             List<Email> newEmails = (List<Email>) NetworkUtils.receiveObject(socket);
 
             if (newEmails != null && !newEmails.isEmpty()) {
                 Platform.runLater(() -> {
+                    // Save current state
+                    boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
+                    boolean wasComposeViewVisible = composeView.isVisible();
+                    Email selectedEmail = currentDisplayedEmail;
+
+                    // Update data while maintaining current filter
                     newEmails.forEach(mailbox::addReceivedEmail);
-                    emailTableView.setItems(mailbox.getAllEmails());
-                    emailTableView.refresh();
+                    filterEmails(currentFilter); // This will update the view with the correct filter
+
+                    // Restore previous view state
+                    if (wasDetailViewVisible && selectedEmail != null) {
+                        displayEmailDetails(selectedEmail);
+                    } else if (wasComposeViewVisible) {
+                        showComposeView();
+                    }
                 });
             }
         } catch (Exception e) {
@@ -450,8 +507,7 @@ public class ClientController {
 
     private void refreshEmailList() {
         Platform.runLater(() -> {
-            emailTableView.setItems(null);
-            emailTableView.setItems(mailbox.getAllEmails());
+            filterEmails(currentFilter);
             emailTableView.refresh();
         });
     }

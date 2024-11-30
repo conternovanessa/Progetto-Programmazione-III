@@ -1,9 +1,13 @@
 package com.emailapp.util;
 
+import com.emailapp.client.model.Email;
+
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class NetworkUtils {
     private static ObjectOutputStream getOutputStream(Socket socket) throws IOException {
@@ -46,4 +50,22 @@ public class NetworkUtils {
             throw new SocketException("Timeout durante l'attesa della risposta del server");
         }
     }
+
+    public static List<Email> fetchEmails(String serverAddress, int serverPort, String emailAddress) throws IOException {
+        try (Socket socket = new Socket(serverAddress, serverPort)) {
+            sendObject(socket, "FETCH_EMAILS");
+            sendObject(socket, emailAddress);
+
+            try {
+                Object response = receiveObject(socket);
+                if (response instanceof List<?>) {
+                    return (List<Email>) response;
+                }
+                return new ArrayList<>();
+            } catch (ClassNotFoundException e) {
+                throw new IOException("Error receiving emails from server", e);
+            }
+        }
+    }
+
 }

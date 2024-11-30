@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 
 public class MailServer {
@@ -191,6 +192,36 @@ public class MailServer {
                 }
                 serverController.logEvent("⚠️ Email " + emailId + " non trovata per l'utente " + requestingUser);
                 return false;
+            }
+        }
+    }
+    public List<Email> getAllEmails() {
+        synchronized (emailLock) {
+            synchronized (accountLock) {
+                List<Email> allEmails = new ArrayList<>();
+                for (EmailAccount account : accounts.values()) {
+                    allEmails.addAll(account.getInbox());
+                    allEmails.addAll(account.getSent());
+                }
+                return allEmails;
+            }
+        }
+    }
+
+    public List<Email> getEmailsFromSender(String sender) {
+        synchronized (emailLock) {
+            synchronized (accountLock) {
+                EmailAccount account = accounts.get(sender);
+                return account != null ? new ArrayList<>(account.getSent()) : new ArrayList<>();
+            }
+        }
+    }
+
+    public List<Email> getEmailsForRecipient(String recipient) {
+        synchronized (emailLock) {
+            synchronized (accountLock) {
+                EmailAccount account = accounts.get(recipient);
+                return account != null ? new ArrayList<>(account.getInbox()) : new ArrayList<>();
             }
         }
     }

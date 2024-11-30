@@ -12,6 +12,7 @@
             <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 10;">
                 <Label fx:id="emailAddressLabel" />
                 <Label fx:id="connectionStatusLabel" />
+                <ComboBox fx:id="emailFilterComboBox" />
                 <Button text="Compose" onAction="#handleComposeEmail" />
             </HBox>
         </top>
