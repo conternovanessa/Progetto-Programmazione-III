@@ -100,10 +100,11 @@ public class ClientController {
                 if (emails != null) {
                     if (filter.equals("Email inviate")) {
                         emails.forEach(mailbox::addSentEmail);
+                        emailTableView.setItems(mailbox.getSentEmails());
                     } else {
                         emails.forEach(mailbox::addReceivedEmail);
+                        emailTableView.setItems(mailbox.getReceivedEmails());
                     }
-                    emailTableView.setItems(mailbox.getAllEmails());
                     emailTableView.refresh();
                 }
             });
@@ -379,26 +380,56 @@ public class ClientController {
     }
 
     private void fetchEmails() {
+        List<Email> fetchedReceivedEmails = null;
+        List<Email> fetchedSentEmails = null;
+    
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "FETCH_EMAILS");
+            // Fetch received emails
+            NetworkUtils.sendObject(socket, "FETCH_RECEIVED_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-
-            // Aggiungi il cast esplicito con il tipo generico
-            @SuppressWarnings("unchecked")
-            List<Email> emails = (List<Email>) NetworkUtils.receiveObject(socket);
-
+    
+            fetchedReceivedEmails = (List<Email>) NetworkUtils.receiveObject(socket);
+        } catch (Exception e) {
+            handleConnectionError();
+            return;
+        }
+    
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            // Fetch sent emails
+            NetworkUtils.sendObject(socket, "FETCH_SENT_EMAILS");
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+    
+            fetchedSentEmails = (List<Email>) NetworkUtils.receiveObject(socket);
+    
+            final List<Email> receivedEmails = fetchedReceivedEmails;
+            final List<Email> sentEmails = fetchedSentEmails;
+    
             Platform.runLater(() -> {
                 mailbox.clearEmails();
-                if (emails != null) {
-                    emails.forEach(mailbox::addReceivedEmail);
-                    emailTableView.setItems(mailbox.getAllEmails());
-                    emailTableView.refresh();
+    
+                if (receivedEmails != null) {
+                    receivedEmails.forEach(mailbox::addReceivedEmail);
                 }
+    
+                if (sentEmails != null) {
+                    sentEmails.forEach(mailbox::addSentEmail);
+                }
+    
+                // Mostra le email appropriate in base al filtro corrente
+                if (currentFilter.equals("Email ricevute")) {
+                    emailTableView.setItems(mailbox.getReceivedEmails());
+                } else {
+                    emailTableView.setItems(mailbox.getSentEmails());
+                }
+                emailTableView.refresh();
             });
         } catch (Exception e) {
             handleConnectionError();
         }
     }
+
+
+
 
     private void displayEmailDetails(Email email) {
         Platform.runLater(() -> {
@@ -439,16 +470,19 @@ public class ClientController {
 
             if (newEmails != null && !newEmails.isEmpty()) {
                 Platform.runLater(() -> {
-                    // Save current state
+                    // Salva lo stato corrente
                     boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
                     boolean wasComposeViewVisible = composeView.isVisible();
                     Email selectedEmail = currentDisplayedEmail;
 
-                    // Update data while maintaining current filter
-                    newEmails.forEach(mailbox::addReceivedEmail);
-                    filterEmails(currentFilter); // This will update the view with the correct filter
+                    // Aggiorna solo le email ricevute durante il polling
+                    if (currentFilter.equals("Email ricevute")) {
+                        newEmails.forEach(mailbox::addReceivedEmail);
+                        emailTableView.setItems(mailbox.getReceivedEmails());
+                        emailTableView.refresh();
+                    }
 
-                    // Restore previous view state
+                    // Ripristina lo stato della vista
                     if (wasDetailViewVisible && selectedEmail != null) {
                         displayEmailDetails(selectedEmail);
                     } else if (wasComposeViewVisible) {

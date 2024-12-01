@@ -121,30 +121,17 @@ public class Mailbox {
         return sentEmails;
     }
 
-    public synchronized void addReceivedEmail(Email email) {
-        if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-            receivedEmails.add(email);
-        }
+    public void addReceivedEmail(Email email) {
+        receivedEmails.add(email);
+    }
+
+    public void addSentEmail(Email email) {
+        sentEmails.add(email);
     }
 
     public void clearEmails() {
         receivedEmails.clear();
         sentEmails.clear();
-    }
-
-    public synchronized void addSentEmail(Email email) {
-        if (!hasEmail(email.getId())) {
-            sentEmails.add(email);
-        }
-    }
-
-    public ObservableList<Email> getAllEmails() {
-        ObservableList<Email> allEmails = FXCollections.observableArrayList();
-        synchronized (this) {
-            allEmails.addAll(receivedEmails);
-            allEmails.addAll(sentEmails);
-        }
-        return allEmails;
     }
 
 
