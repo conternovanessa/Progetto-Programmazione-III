@@ -354,8 +354,7 @@ public class ClientController {
 
     @FXML
     private void handleDeleteEmail() {
-        Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
-        if (selectedEmail != null) {
+        if (currentDisplayedEmail != null) {
             Alert confirmDelete = new Alert(Alert.AlertType.CONFIRMATION);
             confirmDelete.setTitle("Conferma eliminazione");
             confirmDelete.setHeaderText("Eliminare questa email?");
@@ -365,14 +364,17 @@ public class ClientController {
             if (result.isPresent() && result.get() == ButtonType.OK) {
                 try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
                     NetworkUtils.sendObject(socket, "DELETE_EMAIL");
-                    NetworkUtils.sendObject(socket, selectedEmail.getId());
                     NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
+                    NetworkUtils.sendObject(socket, currentDisplayedEmail.getId());
 
                     String response = (String) NetworkUtils.receiveObject(socket);
+
                     if ("OK".equals(response)) {
-                        mailbox.removeEmail(selectedEmail);
+                        mailbox.removeEmail(currentDisplayedEmail);
                         showEmailListView();
                         showInfoAlert("Email Eliminata", "Email eliminata con successo");
+                    } else {
+                        showErrorAlert("Errore", "Impossibile eliminare l'email");
                     }
                 } catch (Exception e) {
                     handleConnectionError();
@@ -380,6 +382,9 @@ public class ClientController {
             }
         }
     }
+
+
+
 
     private void fetchEmails() {
         List<Email> fetchedReceivedEmails = null;
@@ -432,7 +437,7 @@ public class ClientController {
 
     private void displayEmailDetails(Email email) {
         Platform.runLater(() -> {
-            currentDisplayedEmail = email; // Salva l'email corrente
+            currentDisplayedEmail = email; // Store current email reference
             StringBuilder details = new StringBuilder();
             details.append("Da: ").append(email.getSender()).append("\n");
             details.append("A: ").append(String.join(", ", email.getRecipients())).append("\n");
@@ -452,6 +457,7 @@ public class ClientController {
             }
         });
     }
+
 
     private void startPolling() {
         Timeline timeline = new Timeline(new KeyFrame(Duration.millis(POLLING_INTERVAL), e -> pollForNewEmails()));

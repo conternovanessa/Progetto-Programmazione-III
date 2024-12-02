@@ -318,13 +318,24 @@ public class ServerController {
     }
 
     private void handleDeleteEmail(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        int emailId = (int) NetworkUtils.receiveObject(clientSocket);
+        Object idObj = NetworkUtils.receiveObject(clientSocket);
+        int emailId = Integer.parseInt(idObj.toString());
+
         boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
         NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
+
         logEvent(deleted ?
                 "🗑 Email " + emailId + " eliminata da: " + requestingUser :
                 "❌ Eliminazione email " + emailId + " fallita per: " + requestingUser);
     }
+
+
+
+
+
+
+
+
 
     private void handleFetchSentEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String sender = (String) NetworkUtils.receiveObject(clientSocket);
