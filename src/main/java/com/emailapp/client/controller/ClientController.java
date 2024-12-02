@@ -245,7 +245,9 @@ public class ClientController {
                         if ("OK".equals(response)) {
                             showEmailListView();
                             showInfoAlert("Email Inviata", "Email inviata con successo");
-                        } else {
+                            fetchEmails(); // Add this line to immediately refresh the email list
+                        }
+                        else {
                             showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
                         }
                     }
@@ -382,39 +384,39 @@ public class ClientController {
     private void fetchEmails() {
         List<Email> fetchedReceivedEmails = null;
         List<Email> fetchedSentEmails = null;
-    
+
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             // Fetch received emails
             NetworkUtils.sendObject(socket, "FETCH_RECEIVED_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-    
+
             fetchedReceivedEmails = (List<Email>) NetworkUtils.receiveObject(socket);
         } catch (Exception e) {
             handleConnectionError();
             return;
         }
-    
+
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             // Fetch sent emails
             NetworkUtils.sendObject(socket, "FETCH_SENT_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-    
+
             fetchedSentEmails = (List<Email>) NetworkUtils.receiveObject(socket);
-    
+
             final List<Email> receivedEmails = fetchedReceivedEmails;
             final List<Email> sentEmails = fetchedSentEmails;
-    
+
             Platform.runLater(() -> {
                 mailbox.clearEmails();
-    
+
                 if (receivedEmails != null) {
                     receivedEmails.forEach(mailbox::addReceivedEmail);
                 }
-    
+
                 if (sentEmails != null) {
                     sentEmails.forEach(mailbox::addSentEmail);
                 }
-    
+
                 // Mostra le email appropriate in base al filtro corrente
                 if (currentFilter.equals("Email ricevute")) {
                     emailTableView.setItems(mailbox.getReceivedEmails());
@@ -427,9 +429,6 @@ public class ClientController {
             handleConnectionError();
         }
     }
-
-
-
 
     private void displayEmailDetails(Email email) {
         Platform.runLater(() -> {
