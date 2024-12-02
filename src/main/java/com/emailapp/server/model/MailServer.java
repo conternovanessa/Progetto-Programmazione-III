@@ -7,23 +7,24 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.stream.Collectors;
-
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class MailServer {
     private final Map<String, EmailAccount> accounts;
     private final ServerController serverController;
-    private final Object accountLock = new Object();
-    private final Object emailLock = new Object();
-    private Map<String, Queue<Email>> messageQueues = new ConcurrentHashMap<>();
+    private final ReadWriteLock serverLock = new ReentrantReadWriteLock();
+    private final Map<String, Queue<Email>> messageQueues;
 
     public MailServer(ServerController serverController) {
-        this.accounts = new HashMap<>();
+        this.accounts = new ConcurrentHashMap<>();
+        this.messageQueues = new ConcurrentHashMap<>();
         this.serverController = serverController;
-        loadExistingEmails(); // Aggiungi questa chiamata
+        loadExistingEmails();
     }
 
     public void loadExistingEmails() {
+        serverLock.writeLock().lock();
         try {
             List<String> emailAddresses = EmailFileManager.loadValidEmails();
 
@@ -47,21 +48,29 @@ public class MailServer {
             }
         } catch (IOException e) {
             serverController.logEvent("Errore nel caricamento degli indirizzi email validi: " + e.getMessage());
+        } finally {
+            serverLock.writeLock().unlock();
         }
     }
+
     public void createAccount(String emailAddress) {
-        accounts.putIfAbsent(emailAddress, new EmailAccount(emailAddress));
+        serverLock.writeLock().lock();
+        try {
+            accounts.putIfAbsent(emailAddress, new EmailAccount(emailAddress));
+        } finally {
+            serverLock.writeLock().unlock();
+        }
     }
 
     public void sendEmail(Email email) {
-        synchronized (emailLock) {
+        serverLock.writeLock().lock();
+        try {
             String sender = email.getSender();
             List<String> recipients = email.getRecipients();
 
-            synchronized (accountLock) {
-                createAccount(sender);
-                recipients.forEach(this::createAccount);
-            }
+            // Crea gli account se non esistono
+            createAccount(sender);
+            recipients.forEach(this::createAccount);
 
             // Salva una copia dell'email nella cartella sent del mittente
             int sentEmailId = EmailFileManager.getNextId();
@@ -70,6 +79,7 @@ public class MailServer {
 
             try {
                 EmailFileManager.saveEmail(senderCopy, sender);
+                accounts.get(sender).addToSent(senderCopy);
             } catch (IOException e) {
                 serverController.logEvent("Errore durante il salvataggio dell'email inviata per " + sender + ": " + e.getMessage());
             }
@@ -80,63 +90,32 @@ public class MailServer {
                 Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
                 recipientCopy.setId(recipientEmailId);
 
-                synchronized (accountLock) {
-                    accounts.get(recipient).addToInbox(recipientCopy);
-                }
-
                 try {
                     EmailFileManager.saveEmail(recipientCopy, recipient);
+                    accounts.get(recipient).addToInbox(recipientCopy);
+                    queueEmail(recipientCopy, recipient);
                 } catch (IOException e) {
                     serverController.logEvent("Errore durante il salvataggio dell'email per " + recipient + ": " + e.getMessage());
                 }
             }
-
-            // Queue the email for recipients
-            queueEmail(email);
+        } finally {
+            serverLock.writeLock().unlock();
         }
     }
 
-
-    private Email createEmailCopy(Email original) {
-        Email copy = new Email();
-        copy.setId(original.getId());
-        copy.setSender(original.getSender());
-        copy.setRecipients(new ArrayList<>(original.getRecipients()));
-        copy.setSubject(original.getSubject());
-        copy.setBody(original.getBody());
-        copy.setSentDate(original.getSentDate());
-        copy.setRead(false);
-        return copy;
+    private void queueEmail(Email email, String recipient) {
+        messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
+                .offer(email);
     }
 
     public List<Email> getNewEmails(String recipient) {
-        synchronized (emailLock) {
-            synchronized (accountLock) {
-                createAccount(recipient);
-                return new ArrayList<>(accounts.get(recipient).getInbox());
-            }
+        serverLock.readLock().lock();
+        try {
+            EmailAccount account = accounts.get(recipient);
+            return account != null ? new ArrayList<>(account.getInbox()) : new ArrayList<>();
+        } finally {
+            serverLock.readLock().unlock();
         }
-    }
-    public boolean canAccessEmail(int emailId, String requestingUser) {
-        synchronized (emailLock) {
-            synchronized (accountLock) {
-                for (EmailAccount account : accounts.values()) {
-                    if (account.getInbox().stream().anyMatch(email -> email.getId() == emailId) ||
-                            account.getSent().stream().anyMatch(email -> email.getId() == emailId)) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-    }
-
-    public void queueEmail(Email email) {
-        for (String recipient : email.getRecipients()) {
-            messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
-                    .offer(email);
-        }
-
     }
 
     public List<Email> retrieveQueuedEmails(String recipient) {
@@ -154,101 +133,95 @@ public class MailServer {
     }
 
     public List<Email> getEmailsForUser(String recipient) {
-        synchronized (emailLock) {
-            synchronized (accountLock) {
-                createAccount(recipient);
-                EmailAccount account = accounts.get(recipient);
-                List<Email> allEmails = new ArrayList<>();
-                // Aggiungi sia le email ricevute che quelle inviate
-                allEmails.addAll(account.getInbox());
-                allEmails.addAll(account.getSent());
-                return allEmails;
+        serverLock.readLock().lock();
+        try {
+            EmailAccount account = accounts.get(recipient);
+            if (account == null) {
+                return new ArrayList<>();
             }
+            List<Email> allEmails = new ArrayList<>();
+            allEmails.addAll(account.getInbox());
+            allEmails.addAll(account.getSent());
+            return allEmails;
+        } finally {
+            serverLock.readLock().unlock();
         }
     }
-
-
 
     public boolean deleteEmail(int emailId, String requestingUser) {
-        synchronized (emailLock) {
-            synchronized (accountLock) {
-                EmailAccount account = accounts.get(requestingUser);
-                if (account == null) {
-                    serverController.logEvent("⚠️ Tentativo di eliminazione fallito: account non trovato per " + requestingUser);
-                    return false;
-                }
-
-                boolean deletedFromInbox = account.getInbox().removeIf(email -> email.getId() == emailId);
-                boolean deletedFromSent = account.getSent().removeIf(email -> email.getId() == emailId);
-
-                if (deletedFromInbox || deletedFromSent) {
-                    try {
-                        EmailFileManager.deleteEmail(emailId, requestingUser);
-                        return true;
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        return false;
-                    }
-                }
-                serverController.logEvent("⚠️ Email " + emailId + " non trovata per l'utente " + requestingUser);
+        serverLock.writeLock().lock();
+        try {
+            EmailAccount account = accounts.get(requestingUser);
+            if (account == null) {
+                serverController.logEvent("⚠️ Tentativo di eliminazione fallito: account non trovato per " + requestingUser);
                 return false;
             }
+
+            boolean deletedFromInbox = account.removeFromInbox(emailId);
+            boolean deletedFromSent = account.removeFromSent(emailId);
+
+            if (deletedFromInbox || deletedFromSent) {
+                try {
+                    EmailFileManager.deleteEmail(emailId, requestingUser);
+                    return true;
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return false;
+                }
+            }
+            serverController.logEvent("⚠️ Email " + emailId + " non trovata per l'utente " + requestingUser);
+            return false;
+        } finally {
+            serverLock.writeLock().unlock();
         }
     }
+
     public List<Email> getAllEmails() {
-        synchronized (emailLock) {
-            synchronized (accountLock) {
-                List<Email> allEmails = new ArrayList<>();
-                for (EmailAccount account : accounts.values()) {
-                    allEmails.addAll(account.getInbox());
-                    allEmails.addAll(account.getSent());
-                }
-                return allEmails;
+        serverLock.readLock().lock();
+        try {
+            List<Email> allEmails = new ArrayList<>();
+            for (EmailAccount account : accounts.values()) {
+                allEmails.addAll(account.getInbox());
+                allEmails.addAll(account.getSent());
             }
+            return allEmails;
+        } finally {
+            serverLock.readLock().unlock();
         }
     }
 
     public List<Email> getEmailsFromSender(String sender) {
-        synchronized (emailLock) {
-            synchronized (accountLock) {
-                EmailAccount account = accounts.get(sender);
-                return account != null ? new ArrayList<>(account.getSent()) : new ArrayList<>();
-            }
+        serverLock.readLock().lock();
+        try {
+            EmailAccount account = accounts.get(sender);
+            return account != null ? new ArrayList<>(account.getSent()) : new ArrayList<>();
+        } finally {
+            serverLock.readLock().unlock();
         }
     }
 
     public List<Email> getEmailsForRecipient(String recipient) {
-        synchronized (emailLock) {
-            synchronized (accountLock) {
-                EmailAccount account = accounts.get(recipient);
-                return account != null ? new ArrayList<>(account.getInbox()) : new ArrayList<>();
-            }
+        serverLock.readLock().lock();
+        try {
+            EmailAccount account = accounts.get(recipient);
+            return account != null ? new ArrayList<>(account.getInbox()) : new ArrayList<>();
+        } finally {
+            serverLock.readLock().unlock();
         }
     }
 
     public Email getEmailById(int emailId, String requestingUser) {
-    synchronized (emailLock) {
-        synchronized (accountLock) {
+        serverLock.readLock().lock();
+        try {
             for (EmailAccount account : accounts.values()) {
-                Email email = account.getInbox().stream()
-                        .filter(e -> e.getId() == emailId)
-                        .findFirst()
-                        .orElse(null);
-
-                if (email != null) {
-                    return email;
-                }
-
-                email = account.getSent().stream()
-                        .filter(e -> e.getId() == emailId)
-                        .findFirst()
-                        .orElse(null);
-
+                Email email = account.getEmailById(emailId);
                 if (email != null) {
                     return email;
                 }
             }
+            return null;
+        } finally {
+            serverLock.readLock().unlock();
         }
     }
-    return null; // or throw an exception if not found
-}}
+}
