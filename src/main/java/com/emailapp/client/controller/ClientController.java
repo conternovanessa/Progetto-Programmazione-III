@@ -215,18 +215,10 @@ public class ClientController {
 
     @FXML
     private void handleComposeEmail() {
-        if (!isConnected()) {
-            showErrorAlert("Server Disconnesso", "Impossibile aprire l'editor: server non raggiungibile");
-            return;
-        }
-
-        executorService.submit(() -> {
-            if (checkServerAvailability()) {
-                Platform.runLater(() -> {
-                    clearComposeFields();
-                    showComposeView();
-                });
-            }
+        // Remove server availability check
+        Platform.runLater(() -> {
+            clearComposeFields();
+            showComposeView();
         });
     }
 
@@ -237,30 +229,30 @@ public class ClientController {
             return;
         }
 
-        if (validateFields()) {
-            try {
-                Email newEmail = createEmailFromFields();
-                try (Socket controlSocket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-                    NetworkUtils.sendObject(controlSocket, "REQUEST_WRITE_SOCKET");
-                    int dedicatedPort = (int) NetworkUtils.receiveObject(controlSocket);
-                    try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
-                        NetworkUtils.sendObject(dedicatedSocket, newEmail);
-                        NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
+        // Remove field validation here
+        try {
+            Email newEmail = createEmailFromFields();
+            try (Socket controlSocket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                NetworkUtils.sendObject(controlSocket, "REQUEST_WRITE_SOCKET");
+                int dedicatedPort = (int) NetworkUtils.receiveObject(controlSocket);
 
-                        String response = (String) NetworkUtils.receiveObject(dedicatedSocket);
-                        if ("OK".equals(response)) {
-                            showEmailListView();
-                            showInfoAlert("Email Inviata", "Email inviata con successo");
-                            fetchEmails();
-                        }
-                        else {
-                            showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
-                        }
+                try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
+                    NetworkUtils.sendObject(dedicatedSocket, newEmail);
+                    NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
+
+                    String response = (String) NetworkUtils.receiveObject(dedicatedSocket);
+                    if ("OK".equals(response)) {
+                        showEmailListView();
+                        showInfoAlert("Email Inviata", "Email inviata con successo");
+                        fetchEmails();
+                    }
+                    else {
+                        showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
                     }
                 }
-            } catch (Exception e) {
-                handleConnectionError();
             }
+        } catch (Exception e) {
+            handleConnectionError();
         }
     }
 
