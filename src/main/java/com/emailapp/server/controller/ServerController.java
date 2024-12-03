@@ -27,7 +27,7 @@ public class ServerController {
     private ServerSocket serverSocket;
     private volatile boolean isRunning;
     private static final int DEFAULT_PORT = 5000;
-    private static final int SOCKET_TIMEOUT = 30000;// 30 secondi
+    private static final int SOCKET_TIMEOUT = 30000;
     private Set<String> initialFetchDone = new HashSet<>();
 
 

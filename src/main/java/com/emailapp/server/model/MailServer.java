@@ -69,11 +69,9 @@ public class MailServer {
             String sender = email.getSender();
             List<String> recipients = email.getRecipients();
 
-            // Create accounts if they don't exist
             createAccount(sender);
             recipients.forEach(this::createAccount);
 
-            // Save a copy to sender's sent folder
             int sentEmailId = EmailFileManager.getNextId();
             Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
             senderCopy.setId(sentEmailId);
@@ -85,7 +83,6 @@ public class MailServer {
                 serverController.logEvent("Errore durante il salvataggio dell'email inviata per " + sender + ": " + e.getMessage());
             }
 
-            // Send a copy to each recipient
             for (String recipient : recipients) {
                 int recipientEmailId = EmailFileManager.getNextId();
                 Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());

@@ -70,7 +70,7 @@ public class ClientController {
             startConnectionChecker();
             setupEmailTableView();
             setupEmailFilter();
-            startEmailFetcher(); // This will handle the initial load and subsequent updates
+            startEmailFetcher();
             startPolling();
             initialLoadCompleted = true;
         }
@@ -123,7 +123,6 @@ public class ClientController {
     }
 
     private void setupEmailTableView() {
-        // Create and configure table columns
         TableColumn<Email, String> senderColumn = new TableColumn<>("From");
         senderColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSender()));
 
@@ -135,10 +134,7 @@ public class ClientController {
                 data.getValue().getSentDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
         ));
 
-        // Set columns to table
         emailTableView.getColumns().setAll(senderColumn, subjectColumn, dateColumn);
-
-        // Set selection listener
         emailTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             if (newSelection != null) {
                 handleEmailSelection(newSelection);
@@ -148,12 +144,11 @@ public class ClientController {
 
     private void startEmailFetcher() {
         executorService.submit(() -> {
-            // Initial load
+
             if (isConnected()) {
                 fetchEmails();
             }
 
-            // Subsequent periodic checks
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     Thread.sleep(5000);
@@ -243,17 +238,12 @@ public class ClientController {
         }
 
         if (validateFields()) {
-            // Il client invia solo la richiesta al server
             try {
                 Email newEmail = createEmailFromFields();
-                // Inviamo la richiesta al server attraverso una socket di controllo
                 try (Socket controlSocket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
                     NetworkUtils.sendObject(controlSocket, "REQUEST_WRITE_SOCKET");
-                    // Attendiamo che il server ci fornisca una porta dedicata per la comunicazione
                     int dedicatedPort = (int) NetworkUtils.receiveObject(controlSocket);
-                    // Ci connettiamo alla porta dedicata fornita dal server
                     try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
-                        // Procediamo con l'invio dell'email sulla socket dedicata
                         NetworkUtils.sendObject(dedicatedSocket, newEmail);
                         NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
 
@@ -261,7 +251,7 @@ public class ClientController {
                         if ("OK".equals(response)) {
                             showEmailListView();
                             showInfoAlert("Email Inviata", "Email inviata con successo");
-                            fetchEmails(); // Add this line to immediately refresh the email list
+                            fetchEmails();
                         }
                         else {
                             showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
@@ -302,11 +292,10 @@ public class ClientController {
     }
 
     private void populateComposeFields(Email email) {
-        // Clear fields first
+
         toField.clear();
         subjectField.setText(email.getSubject() != null ? email.getSubject() : "");
 
-        // For forward, we don't want to populate recipients
         if (email.getRecipients() != null && !email.getRecipients().isEmpty()) {
             toField.setText(String.join(", ", email.getRecipients()));
         }
@@ -404,7 +393,6 @@ public class ClientController {
         List<Email> fetchedSentEmails = null;
 
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            // Fetch received emails
             NetworkUtils.sendObject(socket, "FETCH_RECEIVED_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
@@ -415,7 +403,6 @@ public class ClientController {
         }
 
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            // Fetch sent emails
             NetworkUtils.sendObject(socket, "FETCH_SENT_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
@@ -435,7 +422,7 @@ public class ClientController {
                     sentEmails.forEach(mailbox::addSentEmail);
                 }
 
-                // Mostra le email appropriate in base al filtro corrente
+
                 if (currentFilter.equals("Email ricevute")) {
                     emailTableView.setItems(mailbox.getReceivedEmails());
                 } else {
@@ -450,7 +437,7 @@ public class ClientController {
 
     private void displayEmailDetails(Email email) {
         Platform.runLater(() -> {
-            currentDisplayedEmail = email; // Store current email reference
+            currentDisplayedEmail = email;
             StringBuilder details = new StringBuilder();
             details.append("Da: ").append(email.getSender()).append("\n");
             details.append("A: ").append(String.join(", ", email.getRecipients())).append("\n");
@@ -487,19 +474,16 @@ public class ClientController {
 
             if (newEmails != null && !newEmails.isEmpty()) {
                 Platform.runLater(() -> {
-                    // Salva lo stato corrente
                     boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
                     boolean wasComposeViewVisible = composeView.isVisible();
                     Email selectedEmail = currentDisplayedEmail;
 
-                    // Aggiorna solo le email ricevute durante il polling
                     if (currentFilter.equals("Email ricevute")) {
                         newEmails.forEach(mailbox::addReceivedEmail);
                         emailTableView.setItems(mailbox.getReceivedEmails());
                         emailTableView.refresh();
                     }
 
-                    // Ripristina lo stato della vista
                     if (wasDetailViewVisible && selectedEmail != null) {
                         displayEmailDetails(selectedEmail);
                     } else if (wasComposeViewVisible) {
@@ -521,10 +505,8 @@ public class ClientController {
             actionButtons.setVisible(false);
             composeView.setVisible(false);
 
-            // Clear selection to allow reselecting the same email
             emailTableView.getSelectionModel().clearSelection();
 
-            // Refresh the email list
             refreshEmailList();
         });
     }
@@ -534,11 +516,11 @@ public class ClientController {
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
         emailTableView.setVisible(false);
-        emailDetailTextArea.setVisible(false);  // Aggiungi questa riga
-        actionButtons.setVisible(false);        // Aggiungi questa riga
-        detailOrComposeStack.getChildren().clear();  // Modifica questa parte
+        emailDetailTextArea.setVisible(false);
+        actionButtons.setVisible(false);
+        detailOrComposeStack.getChildren().clear();
         detailOrComposeStack.getChildren().add(composeView);
-        sendButton.setVisible(true);            // Aggiungi questa riga
+        sendButton.setVisible(true);
     }
 
     private void showEmailListView() {
@@ -550,7 +532,6 @@ public class ClientController {
             emailTableView.setVisible(true);
             actionButtons.setVisible(false);
 
-            // Clear selection and refresh
             emailTableView.getSelectionModel().clearSelection();
             refreshEmailList();
         });
@@ -572,7 +553,7 @@ public class ClientController {
 
         List<String> recipientList = Arrays.asList(recipients.split("\\s*,\\s*"));
         for (String recipient : recipientList) {
-            // Case 1: Check for @ symbol
+
             if (!recipient.contains("@")) {
                 showErrorAlert("Formato Email Non Valido",
                         "L'indirizzo email '" + recipient + "' non contiene il simbolo @");
@@ -583,14 +564,12 @@ public class ClientController {
             String username = parts[0];
             String domain = parts[1];
 
-            // Case 2: Check domain
             if (!"progetto.com".equals(domain)) {
                 showErrorAlert("Dominio Non Valido",
                         "Il dominio deve essere 'progetto.com'. Dominio inserito: '" + domain + "'");
                 return false;
             }
 
-            // Case 3: Check username against emails.txt
             try {
                 List<String> validUsernames = Files.readAllLines(Paths.get("email.txt"))
                         .stream()
@@ -692,8 +671,8 @@ public class ClientController {
             alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(content);
-            alert.initModality(Modality.NONE);  // This makes the alert non-modal
-            alert.show();  // Using show() instead of showAndWait()
+            alert.initModality(Modality.NONE);
+            alert.show();
         });
     }
 

@@ -13,13 +13,11 @@ public class Email implements Serializable {
     private LocalDateTime sentDate;
     private boolean read;
 
-    // Costruttore vuoto
     public Email() {
         this.sentDate = LocalDateTime.now();
         this.read = false;
     }
 
-    // Costruttore completo
     public Email(String sender, List<String> recipients, String subject, String body) {
         this.sender = sender;
         this.recipients = recipients;
@@ -29,7 +27,6 @@ public class Email implements Serializable {
         this.read = false;
     }
 
-    // Getters e Setters
     public int getId() {
         return id;
     }
