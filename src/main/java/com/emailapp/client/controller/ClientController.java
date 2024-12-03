@@ -396,9 +396,6 @@ public class ClientController {
         }
     }
 
-
-
-
     private void fetchEmails() {
         List<Email> fetchedReceivedEmails = null;
         List<Email> fetchedSentEmails = null;
@@ -470,7 +467,6 @@ public class ClientController {
             }
         });
     }
-
 
     private void startPolling() {
         Timeline timeline = new Timeline(new KeyFrame(Duration.millis(POLLING_INTERVAL), e -> pollForNewEmails()));

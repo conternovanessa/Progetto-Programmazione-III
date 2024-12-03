@@ -320,6 +320,7 @@ public class ServerController {
         Object idObj = NetworkUtils.receiveObject(clientSocket);
         int emailId = Integer.parseInt(idObj.toString());
 
+        logEvent("Richiesta al server di eliminare una email con Id: " + emailId +" per l'account: "+ requestingUser);
         boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
         NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
 
