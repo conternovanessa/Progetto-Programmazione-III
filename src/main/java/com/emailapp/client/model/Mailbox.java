@@ -30,30 +30,34 @@ public class Mailbox {
     }
 
     public synchronized void loadEmailsFromServer() {
-        executorService.submit(() -> {
-            try {
-                List<Email> allEmails = NetworkUtils.fetchEmails(SERVER_ADDRESS, SERVER_PORT, emailAddress);
+        if (!emailAddress.isEmpty()) {
+            executorService.submit(() -> {
+                try {
+                    List<Email> allEmails = NetworkUtils.fetchEmails(SERVER_ADDRESS, SERVER_PORT, emailAddress);
 
-                Platform.runLater(() -> {
-                    synchronized (lock) {
-                        clearAllEmails();
-                        for (Email email : allEmails) {
-                            if (email.getSender().equals(emailAddress)) {
-                                sentEmails.add(email);
-                            } else {
-                                receivedEmails.add(email);
+                    Platform.runLater(() -> {
+                        synchronized (lock) {
+                            clearAllEmails();
+                            for (Email email : allEmails) {
+                                if (email.getSender().equals(emailAddress)) {
+                                    addSentEmail(email);
+                                } else {
+                                    addReceivedEmail(email);
+                                }
+                            }
+                            if (emailLoadedCallback != null) {
+                                emailLoadedCallback.run();
                             }
                         }
-                        if (emailLoadedCallback != null) {
-                            emailLoadedCallback.run();
-                        }
-                    }
-                });
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
+                    });
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
     }
+
+
 
     public synchronized void loadEmailsFromDisk() {
         executorService.submit(() -> {

@@ -183,7 +183,6 @@ public class ServerController {
         try {
             mailServer.sendEmail(newEmail);
             NetworkUtils.sendObject(dedicatedSocket, "OK");
-            logEvent("📧 Email processata e inviata con successo");
         } catch (Exception e) {
             NetworkUtils.sendObject(dedicatedSocket, "ERROR: " + e.getMessage());
             logEvent("❌ Errore durante l'invio dell'email");
@@ -193,6 +192,7 @@ public class ServerController {
         dedicatedServerSocket.close();
         logEvent("🔒 Socket dedicata chiusa dopo l'invio");
     }
+
 
     private void handleCheckNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
@@ -309,13 +309,12 @@ public class ServerController {
         try {
             mailServer.sendEmail(newEmail);
             NetworkUtils.sendObject(clientSocket, "OK");
-            String recipientsStr = String.join(", ", newEmail.getRecipients());
-            logEvent("📧 Email inviata da : " + senderEmail + " a: " + recipientsStr);
         } catch (Exception e) {
             NetworkUtils.sendObject(clientSocket, "ERROR: " + e.getMessage());
             logEvent("❌ Invio fallito da: " + senderEmail);
         }
     }
+
 
     private void handleDeleteEmail(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
         Object idObj = NetworkUtils.receiveObject(clientSocket);
@@ -337,19 +336,27 @@ public class ServerController {
 
 
 
-    private void handleFetchSentEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
-        String sender = (String) NetworkUtils.receiveObject(clientSocket);
-        List<Email> sentEmails = mailServer.getEmailsFromSender(sender);
-        NetworkUtils.sendObject(clientSocket, sentEmails);
-        logEvent("📤 Caricate " + sentEmails.size() + " email inviate da: " + sender);
-    }
-
     private void handleFetchReceivedEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
         List<Email> receivedEmails = mailServer.getEmailsForRecipient(recipient);
         NetworkUtils.sendObject(clientSocket, receivedEmails);
-        logEvent("📥 Caricate " + receivedEmails.size() + " email ricevute per: " + recipient);
+
+        if (!initialFetchDone.contains(recipient)) {
+            logEvent("📥 Caricate " + receivedEmails.size() + " email ricevute per: " + recipient);
+            initialFetchDone.add(recipient);
+        }
     }
+
+    private void handleFetchSentEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
+        String sender = (String) NetworkUtils.receiveObject(clientSocket);
+        List<Email> sentEmails = mailServer.getEmailsFromSender(sender);
+        NetworkUtils.sendObject(clientSocket, sentEmails);
+
+        if (!initialFetchDone.contains(sender)) {
+            logEvent("📤 Caricate " + sentEmails.size() + " email inviate da: " + sender);
+        }
+    }
+
 
     private void handleFetchEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String userEmail = (String) NetworkUtils.receiveObject(clientSocket);

@@ -52,6 +52,7 @@ public class ClientController {
     private static final int POLLING_INTERVAL = 1000;
     private Email currentDisplayedEmail;
     private String currentFilter = "Email ricevute";
+    private boolean initialLoadCompleted = false;
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -60,14 +61,19 @@ public class ClientController {
     }
 
     @FXML
-    public void initialize() {
-        setupConnectionListener();
-        startConnectionChecker();
-        setupEmailTableView();
-        setupEmailFilter();
-        startEmailFetcher();
-        startPolling();
+    private void initialize() {
+        if (!initialLoadCompleted) {
+            setupConnectionListener();
+            startConnectionChecker();
+            setupEmailTableView();
+            setupEmailFilter();
+            startEmailFetcher(); // This will handle the initial load and subsequent updates
+            startPolling();
+            initialLoadCompleted = true;
+        }
     }
+
+
 
     private void setupEmailFilter() {
         emailFilterComboBox.getItems().addAll("Email ricevute", "Email inviate");
@@ -139,18 +145,25 @@ public class ClientController {
 
     private void startEmailFetcher() {
         executorService.submit(() -> {
+            // Initial load
+            if (isConnected()) {
+                fetchEmails();
+            }
+
+            // Subsequent periodic checks
             while (!Thread.currentThread().isInterrupted()) {
-                if (isConnected()) {
-                    fetchEmails();
-                }
                 try {
                     Thread.sleep(5000);
+                    if (isConnected()) {
+                        fetchEmails();
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
             }
         });
     }
+
 
     @FXML
     private void handleEmailSelection(Email email) {

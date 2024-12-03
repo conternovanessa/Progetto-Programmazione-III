@@ -68,11 +68,11 @@ public class MailServer {
             String sender = email.getSender();
             List<String> recipients = email.getRecipients();
 
-            // Crea gli account se non esistono
+            // Create accounts if they don't exist
             createAccount(sender);
             recipients.forEach(this::createAccount);
 
-            // Salva una copia dell'email nella cartella sent del mittente
+            // Save a copy to sender's sent folder
             int sentEmailId = EmailFileManager.getNextId();
             Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
             senderCopy.setId(sentEmailId);
@@ -84,7 +84,7 @@ public class MailServer {
                 serverController.logEvent("Errore durante il salvataggio dell'email inviata per " + sender + ": " + e.getMessage());
             }
 
-            // Invia una copia dell'email a ciascun destinatario
+            // Send a copy to each recipient
             for (String recipient : recipients) {
                 int recipientEmailId = EmailFileManager.getNextId();
                 Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
@@ -94,6 +94,7 @@ public class MailServer {
                     EmailFileManager.saveEmail(recipientCopy, recipient);
                     accounts.get(recipient).addToInbox(recipientCopy);
                     queueEmail(recipientCopy, recipient);
+                    serverController.logEvent("📬 Email ricevuta da: " + recipient + " inviata da: " + sender);
                 } catch (IOException e) {
                     serverController.logEvent("Errore durante il salvataggio dell'email per " + recipient + ": " + e.getMessage());
                 }
@@ -102,6 +103,7 @@ public class MailServer {
             serverLock.writeLock().unlock();
         }
     }
+
 
     private void queueEmail(Email email, String recipient) {
         messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
