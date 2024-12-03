@@ -72,9 +72,18 @@ public class MailServer {
 
             // Email validation logic
             for (String recipient : recipients) {
-                if (!recipient.contains("@")) {
-                    serverController.logEvent("Errore: Email non valida - " + recipient);
-                    throw new IllegalArgumentException("Formato email non valido: " + recipient + "manca la @");
+                int atIndex = recipient.indexOf("@");
+
+                // Controllo presenza @
+                if (atIndex == -1) {
+                    serverController.logEvent("Errore: Email non valida - manca la @ per favore inserire");
+                    throw new IllegalArgumentException("Formato email non valido: manca il dominio, inserire '@dominio.com'");
+                }
+
+                // Controllo posizione @
+                if (atIndex == 0 || atIndex == recipient.length() - 1) {
+                    serverController.logEvent("Errore: Posizione non valida della @ - deve essere in mezzo all'indirizzo email");
+                    throw new IllegalArgumentException("Formato email non valido: la @ deve essere tra username e dominio");
                 }
 
                 String[] parts = recipient.split("@");
@@ -93,7 +102,7 @@ public class MailServer {
                             .collect(Collectors.toList());
 
                     if (!validUsernames.contains(username)) {
-                        serverController.logEvent("Errore: Username non valido - " + username + "Account validi: fabiodelia , filippoditto, vanessaconterno");
+                        serverController.logEvent("Errore: Username non valido - " + username + " Account validi: fabiodelia , filippoditto, vanessaconterno");
                         throw new IllegalArgumentException("Username non valido: " + username);
                     }
                 } catch (IOException e) {
@@ -134,6 +143,7 @@ public class MailServer {
             serverLock.writeLock().unlock();
         }
     }
+
 
     private void queueEmail(Email email, String recipient) {
         messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
