@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 public class MailServer {
     private final Map<String, EmailAccount> accounts;
@@ -68,6 +69,38 @@ public class MailServer {
         try {
             String sender = email.getSender();
             List<String> recipients = email.getRecipients();
+
+            // Email validation logic
+            for (String recipient : recipients) {
+                if (!recipient.contains("@")) {
+                    serverController.logEvent("Errore: Email non valida - " + recipient);
+                    throw new IllegalArgumentException("Formato email non valido: " + recipient);
+                }
+
+                String[] parts = recipient.split("@");
+                String username = parts[0];
+                String domain = parts[1];
+
+                if (!"progetto.com".equals(domain)) {
+                    serverController.logEvent("Errore: Dominio non valido - " + domain);
+                    throw new IllegalArgumentException("Dominio non valido: " + domain);
+                }
+
+                try {
+                    List<String> validUsernames = EmailFileManager.loadValidEmails()
+                            .stream()
+                            .map(e -> e.split("@")[0])
+                            .collect(Collectors.toList());
+
+                    if (!validUsernames.contains(username)) {
+                        serverController.logEvent("Errore: Username non valido - " + username);
+                        throw new IllegalArgumentException("Username non valido: " + username);
+                    }
+                } catch (IOException e) {
+                    serverController.logEvent("Errore di sistema durante la verifica dell'username");
+                    throw new RuntimeException("Impossibile verificare l'username", e);
+                }
+            }
 
             createAccount(sender);
             recipients.forEach(this::createAccount);

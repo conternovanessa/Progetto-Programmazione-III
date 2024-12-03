@@ -551,42 +551,6 @@ public class ClientController {
             return false;
         }
 
-        List<String> recipientList = Arrays.asList(recipients.split("\\s*,\\s*"));
-        for (String recipient : recipientList) {
-
-            if (!recipient.contains("@")) {
-                showErrorAlert("Formato Email Non Valido",
-                        "L'indirizzo email '" + recipient + "' non contiene il simbolo @");
-                return false;
-            }
-
-            String[] parts = recipient.split("@");
-            String username = parts[0];
-            String domain = parts[1];
-
-            if (!"progetto.com".equals(domain)) {
-                showErrorAlert("Dominio Non Valido",
-                        "Il dominio deve essere 'progetto.com'. Dominio inserito: '" + domain + "'");
-                return false;
-            }
-
-            try {
-                List<String> validUsernames = Files.readAllLines(Paths.get("email.txt"))
-                        .stream()
-                        .map(email -> email.split("@")[0])
-                        .collect(Collectors.toList());
-
-                if (!validUsernames.contains(username)) {
-                    showErrorAlert("Username Non Valido",
-                            "L'username '" + username + "' non è presente nel sistema");
-                    return false;
-                }
-            } catch (IOException e) {
-                showErrorAlert("Errore Sistema", "Impossibile verificare l'username");
-                return false;
-            }
-        }
-
         if (subjectField.getText().trim().isEmpty()) {
             showErrorAlert("Campo Mancante", "Il campo 'Oggetto' è obbligatorio");
             return false;
@@ -598,16 +562,6 @@ public class ClientController {
         }
 
         return true;
-    }
-
-    private boolean isValidEmailInSystem(String email) {
-        try {
-            List<String> validEmails = Files.readAllLines(Paths.get("email.txt"));
-            return validEmails.contains(email);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
     }
 
     public void checkConnection() {
