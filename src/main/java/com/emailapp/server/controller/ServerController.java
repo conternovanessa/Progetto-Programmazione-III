@@ -257,7 +257,7 @@ public class ServerController {
 
         Email replyAllEmail = new Email();
         replyAllEmail.setRecipients(new ArrayList<>(recipients));
-        replyAllEmail.setSubject("Re: " + originalEmail.getSubject());
+        replyAllEmail.setSubject("Re_ALL: " + originalEmail.getSubject());
         replyAllEmail.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
 
         NetworkUtils.sendObject(clientSocket, "OK");
