@@ -74,7 +74,7 @@ public class MailServer {
             for (String recipient : recipients) {
                 if (!recipient.contains("@")) {
                     serverController.logEvent("Errore: Email non valida - " + recipient);
-                    throw new IllegalArgumentException("Formato email non valido: " + recipient);
+                    throw new IllegalArgumentException("Formato email non valido: " + recipient + "manca la @");
                 }
 
                 String[] parts = recipient.split("@");
@@ -82,7 +82,7 @@ public class MailServer {
                 String domain = parts[1];
 
                 if (!"progetto.com".equals(domain)) {
-                    serverController.logEvent("Errore: Dominio non valido - " + domain);
+                    serverController.logEvent("Errore: Dominio non valido - " + domain +" il dominio deve terminare in progetto.com");
                     throw new IllegalArgumentException("Dominio non valido: " + domain);
                 }
 
@@ -93,7 +93,7 @@ public class MailServer {
                             .collect(Collectors.toList());
 
                     if (!validUsernames.contains(username)) {
-                        serverController.logEvent("Errore: Username non valido - " + username);
+                        serverController.logEvent("Errore: Username non valido - " + username + "Account validi: fabiodelia , filippoditto, vanessaconterno");
                         throw new IllegalArgumentException("Username non valido: " + username);
                     }
                 } catch (IOException e) {
