@@ -4,6 +4,7 @@ import com.emailapp.client.model.Email;
 import com.emailapp.server.controller.ServerController;
 import com.emailapp.util.EmailFileManager;
 import java.io.IOException;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -104,7 +105,6 @@ public class MailServer {
         }
     }
 
-
     private void queueEmail(Email email, String recipient) {
         messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
                 .offer(email);
@@ -150,6 +150,101 @@ public class MailServer {
         }
     }
 
+    public Email createReplyEmail(int emailId, String requestingUser) {
+        Email originalEmail = getEmailById(emailId, requestingUser);
+        if (originalEmail == null) {
+            return null;
+        }
+
+        Email replyEmail = new Email();
+        replyEmail.setSender(requestingUser);
+        replyEmail.setRecipients(Collections.singletonList(originalEmail.getSender()));
+        replyEmail.setSubject("Re: " + originalEmail.getSubject());
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        String formattedDate = originalEmail.getSentDate().format(formatter);
+
+        String replyBody = String.format("""
+        
+        
+        ----- Messaggio Originale -----
+        Da: %s
+        Data: %s
+        Oggetto: %s
+        
+        %s""",
+                originalEmail.getSender(),
+                formattedDate,
+                originalEmail.getSubject(),
+                originalEmail.getBody());
+
+        replyEmail.setBody(replyBody);
+        return replyEmail;
+    }
+
+    public Email createReplyAllEmail(int emailId, String requestingUser) {
+        Email originalEmail = getEmailById(emailId, requestingUser);
+        if (originalEmail == null) {
+            return null;
+        }
+
+        Set<String> recipients = new HashSet<>(originalEmail.getRecipients());
+        recipients.add(originalEmail.getSender());
+        recipients.remove(requestingUser);
+
+        Email replyAllEmail = new Email();
+        replyAllEmail.setSender(requestingUser);
+        replyAllEmail.setRecipients(new ArrayList<>(recipients));
+        replyAllEmail.setSubject("Re_ALL: " + originalEmail.getSubject());
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        String formattedDate = originalEmail.getSentDate().format(formatter);
+
+        String replyBody = String.format("""
+        
+        
+        ----- Messaggio Originale -----
+        Da: %s
+        Data: %s
+        Oggetto: %s
+        
+        %s""",
+                originalEmail.getSender(),
+                formattedDate,
+                originalEmail.getSubject(),
+                originalEmail.getBody());
+
+        replyAllEmail.setBody(replyBody);
+        return replyAllEmail;
+    }
+
+    public Email createForwardEmail(int emailId, String requestingUser) {
+        Email originalEmail = getEmailById(emailId, requestingUser);
+        if (originalEmail == null) {
+            return null;
+        }
+
+        Email forwardEmail = new Email();
+        forwardEmail.setSender(requestingUser);
+        forwardEmail.setSubject("Fwd: " + originalEmail.getSubject());
+
+        String forwardedContent = String.format("""
+        
+        ----- Messaggio Inoltrato -----
+        Da: %s
+        A: %s
+        Oggetto: %s
+        
+        %s""",
+                originalEmail.getSender(),
+                String.join(", ", originalEmail.getRecipients()),
+                originalEmail.getSubject(),
+                originalEmail.getBody());
+
+        forwardEmail.setBody(forwardedContent);
+        return forwardEmail;
+    }
+
     public boolean deleteEmail(int emailId, String requestingUser) {
         serverLock.writeLock().lock();
         try {
@@ -175,20 +270,6 @@ public class MailServer {
             return false;
         } finally {
             serverLock.writeLock().unlock();
-        }
-    }
-
-    public List<Email> getAllEmails() {
-        serverLock.readLock().lock();
-        try {
-            List<Email> allEmails = new ArrayList<>();
-            for (EmailAccount account : accounts.values()) {
-                allEmails.addAll(account.getInbox());
-                allEmails.addAll(account.getSent());
-            }
-            return allEmails;
-        } finally {
-            serverLock.readLock().unlock();
         }
     }
 
