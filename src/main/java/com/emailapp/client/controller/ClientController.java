@@ -698,6 +698,7 @@ public class ClientController {
     }
 
 
+
     private void showInfoAlert(String title, String content) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
