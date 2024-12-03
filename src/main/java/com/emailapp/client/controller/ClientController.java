@@ -247,7 +247,8 @@ public class ClientController {
                         fetchEmails();
                     }
                     else {
-                        showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
+                        String cleanedResponse = response.replace("ERROR: ", "");
+                        showErrorAlert("Errore", "Impossibile inviare l'email: " + cleanedResponse);
                     }
                 }
             }
