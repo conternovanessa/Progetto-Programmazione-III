@@ -15,6 +15,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
 import javafx.animation.Timeline;
+import javafx.stage.Modality;
 import javafx.util.Duration;
 
 import java.io.*;
@@ -53,6 +54,8 @@ public class ClientController {
     private Email currentDisplayedEmail;
     private String currentFilter = "Email ricevute";
     private boolean initialLoadCompleted = false;
+    private volatile boolean isShuttingDown = false;
+    private volatile boolean alertShown = false;
 
     public ClientController() {
         this.mailbox = new Mailbox("");
@@ -632,20 +635,27 @@ public class ClientController {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, "PING");
             String response = (String) NetworkUtils.receiveObject(socket);
-            Platform.runLater(() -> connectedProperty.set("PONG".equals(response)));
+            boolean isConnected = "PONG".equals(response);
+            Platform.runLater(() -> {
+                connectedProperty.set(isConnected);
+                if (isConnected) {
+                    alertShown = false;
+                }
+            });
         } catch (Exception e) {
-            Platform.runLater(() -> connectedProperty.set(false));
+            handleConnectionError();
         }
     }
 
     private void startConnectionChecker() {
         executorService.submit(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
+            while (!Thread.currentThread().isInterrupted() && !isShuttingDown) {
                 checkConnection();
                 try {
                     Thread.sleep(5000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    break;
                 }
             }
         });
@@ -667,10 +677,13 @@ public class ClientController {
     }
 
     private void handleConnectionError() {
-        Platform.runLater(() -> {
-            connectedProperty.set(false);
-            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
-        });
+        if (!alertShown) {
+            Platform.runLater(() -> {
+                connectedProperty.set(false);
+                showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
+                alertShown = true;
+            });
+        }
     }
 
     private void showErrorAlert(String title, String content) {
@@ -679,9 +692,11 @@ public class ClientController {
             alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(content);
-            alert.showAndWait();
+            alert.initModality(Modality.NONE);  // This makes the alert non-modal
+            alert.show();  // Using show() instead of showAndWait()
         });
     }
+
 
     private void showInfoAlert(String title, String content) {
         Platform.runLater(() -> {
