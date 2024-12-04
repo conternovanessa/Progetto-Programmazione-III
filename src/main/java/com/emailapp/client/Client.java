@@ -12,7 +12,6 @@ public class Client extends Application {
     private ClientController controller;
 
     public Client() {
-
     }
 
     public void setEmailAddress(String emailAddress) {
@@ -37,21 +36,7 @@ public class Client extends Application {
         primaryStage.setTitle("Email Client - " + emailAddress);
 
         ClientManager.getInstance().registerClient(emailAddress, primaryStage, this);
-
-        primaryStage.setOnCloseRequest(event -> {
-            if (controller != null) {
-                controller.shutdown();
-            }
-            ClientManager.getInstance().removeClient(emailAddress);
-        });
-
+        primaryStage.setOnCloseRequest(e -> ClientManager.getInstance().removeClient(emailAddress));
         primaryStage.show();
-        controller.checkConnection();
-    }
-
-    public void shutdown() {
-        if (controller != null) {
-            controller.shutdown();
-        }
     }
 }
