@@ -15,6 +15,7 @@ import javafx.stage.Modality;
 import javafx.util.Duration;
 import javafx.beans.property.SimpleStringProperty;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -167,20 +168,26 @@ public class ClientController {
 
         try {
             Email newEmail = createEmailFromFields();
+            System.out.println("Attempting to send email...");
             String response = mailClient.sendEmail(newEmail);
+            System.out.println("Server response: " + response);
 
             if ("OK".equals(response)) {
                 showEmailListView();
                 showInfoAlert("Email Inviata", "Email inviata con successo");
                 filterEmails(currentFilter);
             } else {
-                String cleanedResponse = response.replace("ERROR: ", "");
-                showErrorAlert("Errore", "Impossibile inviare l'email: " + cleanedResponse);
+                String errorMsg = response.startsWith("ERROR: ") ?
+                        response.substring(7) : "Errore sconosciuto";
+                showErrorAlert("Errore", "Impossibile inviare l'email: " + errorMsg);
             }
         } catch (Exception e) {
+            System.err.println("Error sending email: " + e.getMessage());
+            e.printStackTrace();
             handleConnectionError();
         }
     }
+
 
     @FXML
     private void handleReplyEmail() {
@@ -387,12 +394,20 @@ public class ClientController {
 
     private Email createEmailFromFields() {
         Email email = new Email();
-        email.setRecipients(Arrays.asList(toField.getText().split("\\s*,\\s*")));
-        email.setSubject(subjectField.getText());
-        email.setBody(bodyArea.getText());
         email.setSender(mailClient.getMailbox().getEmailAddress());
+
+        // Split and trim recipients
+        String[] recipients = toField.getText().split("\\s*,\\s*");
+        email.setRecipients(Arrays.asList(recipients));
+
+        email.setSubject(subjectField.getText().trim());
+        email.setBody(bodyArea.getText().trim());
+        email.setSentDate(LocalDateTime.now());
+
+        System.out.println("Created email: " + email); // Debug print
         return email;
     }
+
 
     private void populateComposeFields(Email email) {
         toField.clear();
