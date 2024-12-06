@@ -96,13 +96,17 @@ public class StartApp extends Application {
             }
             String line;
             while ((line = reader.readLine()) != null) {
-                emails.add(line.trim());
+                String[] parts = line.trim().split(",");
+                if (parts.length >= 1) {
+                    emails.add(parts[0].trim());
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
         return emails;
     }
+
 
     @Override
     public void stop() {
