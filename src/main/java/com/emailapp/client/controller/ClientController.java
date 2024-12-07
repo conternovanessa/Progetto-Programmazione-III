@@ -23,7 +23,9 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class ClientController implements MailClient.UICallback {
+public class ClientController {
+    private static final int POLLING_INTERVAL = 1000;
+
     @FXML private Label emailAddressLabel;
     @FXML private Label connectionStatusLabel;
     @FXML private TableView<Email> emailTableView;
@@ -39,55 +41,119 @@ public class ClientController implements MailClient.UICallback {
     @FXML private ComboBox<String> emailFilterComboBox;
 
     private final MailClient mailClient;
+    private final ExecutorService executorService;
+    private String currentFilter = "Email ricevute";
     private Email currentDisplayedEmail;
     private boolean initialLoadCompleted = false;
+    private volatile boolean alertShown = false;
+    private boolean isComposeViewVisible = false;
 
     public ClientController() {
-        this.mailClient = new MailClient("", this);
+        this.mailClient = new MailClient("");
+        this.executorService = Executors.newCachedThreadPool();
     }
 
     @FXML
     private void initialize() {
         if (!initialLoadCompleted) {
+            setupConnectionListener();
+            startConnectionChecker();
             setupEmailTableView();
             setupEmailFilter();
-            mailClient.startConnectionChecker();
-            mailClient.startEmailFetcher();
+            startEmailFetcher();
+            startPolling();
             initialLoadCompleted = true;
         }
     }
 
-    private void setupEmailTableView() {
-        TableColumn<Email, String> senderColumn = new TableColumn<>("From");
-        senderColumn.setCellValueFactory(data ->
-                new SimpleStringProperty(data.getValue().getSender()));
+    public void setEmailAddress(String emailAddress) {
+        // Rimuovi la porta se presente nell'indirizzo email
+        if (emailAddress.contains(",")) {
+            emailAddress = emailAddress.split(",")[0].trim();
+        }
+        mailClient.getMailbox().setEmailAddress(emailAddress);
+        emailAddressLabel.setText(emailAddress);
+    }
 
-        TableColumn<Email, String> subjectColumn = new TableColumn<>("Subject");
-        subjectColumn.setCellValueFactory(data ->
-                new SimpleStringProperty(data.getValue().getSubject()));
 
-        TableColumn<Email, String> dateColumn = new TableColumn<>("Date");
-        dateColumn.setCellValueFactory(data ->
-                new SimpleStringProperty(data.getValue().getSentDate()
-                        .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))));
-
-        emailTableView.getColumns().setAll(senderColumn, subjectColumn, dateColumn);
-        emailTableView.getSelectionModel().selectedItemProperty().addListener(
-                (obs, oldSelection, newSelection) -> {
-                    if (newSelection != null) {
-                        handleEmailSelection(newSelection);
-                    }
-                });
+    private void setupConnectionListener() {
+        mailClient.connectedProperty().addListener((observable, oldValue, newValue) -> {
+            Platform.runLater(() -> {
+                connectionStatusLabel.setText(newValue ? "Connected" : "Disconnected");
+                connectionStatusLabel.setStyle(newValue ? "-fx-text-fill: green;" : "-fx-text-fill: red;");
+            });
+        });
     }
 
     private void setupEmailFilter() {
         emailFilterComboBox.getItems().addAll("Email ricevute", "Email inviate");
-        emailFilterComboBox.setValue("Email ricevute");
+        emailFilterComboBox.setValue(currentFilter);
         emailFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
-                mailClient.setCurrentFilter(newVal);
+                currentFilter = newVal;
+                filterEmails(newVal);
             }
         });
+    }
+
+    private void setupEmailTableView() {
+        TableColumn<Email, String> senderColumn = new TableColumn<>("From");
+        senderColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSender()));
+
+        TableColumn<Email, String> subjectColumn = new TableColumn<>("Subject");
+        subjectColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSubject()));
+
+        TableColumn<Email, String> dateColumn = new TableColumn<>("Date");
+        dateColumn.setCellValueFactory(data -> new SimpleStringProperty(
+                data.getValue().getSentDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+        ));
+
+        emailTableView.getColumns().setAll(senderColumn, subjectColumn, dateColumn);
+        emailTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            if (newSelection != null) {
+                handleEmailSelection(newSelection);
+            }
+        });
+    }
+
+    private void handleEmailSelection(Email email) {
+        if (!mailClient.isConnected()) {
+            showErrorAlert("Server non raggiungibile", "Impossibile aprire l'email: server non disponibile");
+            return;
+        }
+
+        try {
+            mailClient.markEmailAsRead(email);
+            displayEmailDetails(email);
+        } catch (Exception e) {
+            showErrorAlert("Errore", "Impossibile aprire l'email");
+        }
+    }
+
+    private void filterEmails(String filter) {
+        if (!mailClient.isConnected()) {
+            showErrorAlert("Server Disconnesso", "Impossibile filtrare le email: server non raggiungibile");
+            return;
+        }
+
+        try {
+            List<Email> emails = mailClient.fetchEmails(filter);
+            Platform.runLater(() -> {
+                mailClient.getMailbox().clearEmails();
+                if (emails != null) {
+                    if (filter.equals("Email inviate")) {
+                        emails.forEach(mailClient.getMailbox()::addSentEmail);
+                        emailTableView.setItems(mailClient.getMailbox().getSentEmails());
+                    } else {
+                        emails.forEach(mailClient.getMailbox()::addReceivedEmail);
+                        emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
+                    }
+                    emailTableView.refresh();
+                }
+            });
+        } catch (Exception e) {
+            handleConnectionError();
+        }
     }
 
     @FXML
@@ -101,21 +167,32 @@ public class ClientController implements MailClient.UICallback {
     @FXML
     private void handleSendEmail() {
         if (!mailClient.isConnected()) {
-            showErrorAlert("Server Disconnesso", "Impossibile inviare l'email");
+            showErrorAlert("Server Disconnesso", "Impossibile inviare l'email: server non raggiungibile");
             return;
         }
 
         try {
-            Email email = createEmailFromFields();
-            String response = mailClient.sendEmail(email);
+            Email newEmail = createEmailFromFields();
+            System.out.println("Attempting to send email...");
+            String response = mailClient.sendEmail(newEmail);
+            System.out.println("Server response: " + response);
+
             if ("OK".equals(response)) {
                 showEmailListView();
                 showInfoAlert("Email Inviata", "Email inviata con successo");
+                filterEmails(currentFilter);
+            } else {
+                String errorMsg = response.startsWith("ERROR: ") ?
+                        response.substring(7) : "Errore sconosciuto";
+                showErrorAlert("Errore", "Impossibile inviare l'email: " + errorMsg);
             }
         } catch (Exception e) {
-            showErrorAlert("Errore", "Impossibile inviare l'email");
+            System.err.println("Error sending email: " + e.getMessage());
+            e.printStackTrace();
+            handleConnectionError();
         }
     }
+
 
     @FXML
     private void handleReplyEmail() {
@@ -125,11 +202,11 @@ public class ClientController implements MailClient.UICallback {
         }
 
         try {
-            Email replyTemplate = mailClient.createReplyEmail("REPLY", currentDisplayedEmail.getId());
+            Email replyTemplate = mailClient.createReplyEmail("REPLY",currentDisplayedEmail.getId());
             populateComposeFields(replyTemplate);
             showComposeView();
         } catch (Exception e) {
-            showErrorAlert("Errore", "Impossibile creare risposta");
+            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
         }
     }
 
@@ -141,11 +218,11 @@ public class ClientController implements MailClient.UICallback {
         }
 
         try {
-            Email replyTemplate = mailClient.createReplyEmail("REPLY_ALL", currentDisplayedEmail.getId());
-            populateComposeFields(replyTemplate);
+            Email replyAllTemplate = mailClient.createReplyEmail("REPLY_ALL",currentDisplayedEmail.getId());
+            populateComposeFields(replyAllTemplate);
             showComposeView();
         } catch (Exception e) {
-            showErrorAlert("Errore", "Impossibile creare risposta a tutti");
+            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
         }
     }
 
@@ -161,7 +238,7 @@ public class ClientController implements MailClient.UICallback {
             populateComposeFields(forwardTemplate);
             showComposeView();
         } catch (Exception e) {
-            showErrorAlert("Errore", "Impossibile inoltrare email");
+            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
         }
     }
 
@@ -176,120 +253,119 @@ public class ClientController implements MailClient.UICallback {
             Optional<ButtonType> result = confirmDelete.showAndWait();
             if (result.isPresent() && result.get() == ButtonType.OK) {
                 try {
-                    // Delete from server
                     mailClient.deleteEmail(String.valueOf(currentDisplayedEmail.getId()));
-
-                    // Immediately update local view
-                    Platform.runLater(() -> {
-                        // Remove from mailbox
-                        mailClient.getMailbox().removeEmail(currentDisplayedEmail);
-
-                        // Update TableView based on current filter
-                        if (emailFilterComboBox.getValue().equals("Email inviate")) {
-                            emailTableView.setItems(mailClient.getMailbox().getSentEmails());
-                        } else {
-                            emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
-                        }
-
-                        // Refresh view and show success message
-                        emailTableView.refresh();
-                        showEmailListView();
-                        showInfoAlert("Email Eliminata", "Email eliminata con successo");
-                    });
-
+                    mailClient.getMailbox().removeEmail(currentDisplayedEmail);
+                    showEmailListView();
+                    showInfoAlert("Email Eliminata", "Email eliminata con successo");
                 } catch (Exception e) {
-                    showErrorAlert("Errore", "Impossibile eliminare l'email");
+                    handleConnectionError();
                 }
             }
         }
     }
 
-
-    @FXML
-    private void handleBackButton() {
-        showEmailListView();
-    }
-
-    // UICallback implementations
-    @Override
-    public void updateEmailList(List<Email> emails) {
-        Platform.runLater(() -> {
-            mailClient.getMailbox().clearEmails();
-            if (emails != null) {
-                if (emailFilterComboBox.getValue().equals("Email inviate")) {
-                    emails.forEach(mailClient.getMailbox()::addSentEmail);
-                    emailTableView.setItems(mailClient.getMailbox().getSentEmails());
-                } else {
-                    emails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                    emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
+    private void startEmailFetcher() {
+        executorService.submit(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    if (mailClient.isConnected()) {
+                        filterEmails(currentFilter);
+                    }
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
-                emailTableView.refresh();
             }
         });
     }
 
-    @Override
-    public void handleError(String message) {
-        Platform.runLater(() -> showErrorAlert("Errore", message));
+    private void startPolling() {
+        Timeline timeline = new Timeline(new KeyFrame(Duration.millis(POLLING_INTERVAL), e -> pollForNewEmails()));
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
     }
 
-    @Override
-    public void handleNewEmails(List<Email> emails, String filter) {
-        Platform.runLater(() -> {
-            if (filter.equals("Email ricevute")) {
-                emails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
-                emailTableView.refresh();
-            }
-        });
-    }
-
-    @Override
-    public void updateConnectionStatus(boolean connected) {
-        Platform.runLater(() -> {
-            connectionStatusLabel.setText(connected ? "Connected" : "Disconnected");
-            connectionStatusLabel.setStyle(connected ? "-fx-text-fill: green;" : "-fx-text-fill: red;");
-        });
-    }
-
-    // Helper methods
-    private void handleEmailSelection(Email email) {
+    private void pollForNewEmails() {
         try {
-            mailClient.markEmailAsRead(email);
-            displayEmailDetails(email);
+            List<Email> newEmails = mailClient.checkNewEmails();
+            if (newEmails != null && !newEmails.isEmpty()) {
+                Platform.runLater(() -> {
+                    boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
+                    boolean wasComposeViewVisible = composeView.isVisible();
+                    Email selectedEmail = currentDisplayedEmail;
+
+                    if (currentFilter.equals("Email ricevute")) {
+                        newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
+                        emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
+                        emailTableView.refresh();
+                    }
+
+                    if (wasDetailViewVisible && selectedEmail != null) {
+                        displayEmailDetails(selectedEmail);
+                    } else if (wasComposeViewVisible) {
+                        showComposeView();
+                    }
+                });
+            }
         } catch (Exception e) {
-            showErrorAlert("Errore", "Impossibile aprire l'email");
+            handleConnectionError();
         }
+    }
+
+    private void startConnectionChecker() {
+        executorService.submit(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                mailClient.checkConnection();
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
     }
 
     private void displayEmailDetails(Email email) {
         Platform.runLater(() -> {
             currentDisplayedEmail = email;
-            StringBuilder details = new StringBuilder()
-                    .append("Da: ").append(email.getSender()).append("\n")
-                    .append("A: ").append(String.join(", ", email.getRecipients())).append("\n")
-                    .append("Oggetto: ").append(email.getSubject()).append("\n\n")
-                    .append(email.getBody());
+            StringBuilder details = new StringBuilder();
+            details.append("Da: ").append(email.getSender()).append("\n");
+            details.append("A: ").append(String.join(", ", email.getRecipients())).append("\n");
+            details.append("Oggetto: ").append(email.getSubject()).append("\n\n");
+            details.append(email.getBody());
 
             emailDetailTextArea.setText(details.toString());
-            showDetailView();
+            emailDetailTextArea.setVisible(true);
+            emailDetailFlow.setVisible(true);
+            emailTableView.setVisible(false);
+            actionButtons.setVisible(true);
+            composeView.setVisible(false);
+
+            if (!detailOrComposeStack.getChildren().contains(emailDetailTextArea)) {
+                detailOrComposeStack.getChildren().clear();
+                detailOrComposeStack.getChildren().add(emailDetailTextArea);
+            }
         });
     }
 
-    private void showDetailView() {
-        emailDetailTextArea.setVisible(true);
-        emailDetailFlow.setVisible(true);
-        emailTableView.setVisible(false);
-        actionButtons.setVisible(true);
-        composeView.setVisible(false);
+    @FXML
+    private void handleBackButton() {
+        Platform.runLater(() -> {
+            emailTableView.setVisible(true);
+            emailDetailFlow.setVisible(false);
+            emailDetailTextArea.setVisible(false);
+            actionButtons.setVisible(false);
+            composeView.setVisible(false);
 
-        if (!detailOrComposeStack.getChildren().contains(emailDetailTextArea)) {
-            detailOrComposeStack.getChildren().clear();
-            detailOrComposeStack.getChildren().add(emailDetailTextArea);
-        }
+            emailTableView.getSelectionModel().clearSelection();
+            refreshEmailList();
+        });
     }
 
     private void showComposeView() {
+        isComposeViewVisible = true;
         composeView.setVisible(true);
         emailDetailFlow.setVisible(false);
         emailTableView.setVisible(false);
@@ -302,29 +378,50 @@ public class ClientController implements MailClient.UICallback {
 
     private void showEmailListView() {
         Platform.runLater(() -> {
+            isComposeViewVisible = false;
             composeView.setVisible(false);
             emailDetailFlow.setVisible(false);
             emailDetailTextArea.setVisible(false);
             emailTableView.setVisible(true);
             actionButtons.setVisible(false);
+
             emailTableView.getSelectionModel().clearSelection();
+            refreshEmailList();
+        });
+    }
+
+    private void refreshEmailList() {
+        Platform.runLater(() -> {
+            filterEmails(currentFilter);
+            emailTableView.refresh();
         });
     }
 
     private Email createEmailFromFields() {
         Email email = new Email();
         email.setSender(mailClient.getMailbox().getEmailAddress());
-        email.setRecipients(Arrays.asList(toField.getText().split("\\s*,\\s*")));
+
+        // Split and trim recipients
+        String[] recipients = toField.getText().split("\\s*,\\s*");
+        email.setRecipients(Arrays.asList(recipients));
+
         email.setSubject(subjectField.getText().trim());
         email.setBody(bodyArea.getText().trim());
         email.setSentDate(LocalDateTime.now());
+
+        System.out.println("Created email: " + email); // Debug print
         return email;
     }
 
+
     private void populateComposeFields(Email email) {
-        toField.setText(email.getRecipients() != null ?
-                String.join(", ", email.getRecipients()) : "");
+        toField.clear();
         subjectField.setText(email.getSubject() != null ? email.getSubject() : "");
+
+        if (email.getRecipients() != null && !email.getRecipients().isEmpty()) {
+            toField.setText(String.join(", ", email.getRecipients()));
+        }
+
         bodyArea.setText(email.getBody() != null ? email.getBody() : "");
     }
 
@@ -334,15 +431,27 @@ public class ClientController implements MailClient.UICallback {
         bodyArea.clear();
     }
 
+    private void handleConnectionError() {
+        if (!alertShown) {
+            Platform.runLater(() -> {
+                showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
+                alertShown = true;
+            });
+        }
+    }
+
     private void showErrorAlert(String title, String content) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(content);
+            alert.initModality(Modality.NONE);
             alert.show();
         });
     }
+
+
 
     private void showInfoAlert(String title, String content) {
         Platform.runLater(() -> {
@@ -354,11 +463,7 @@ public class ClientController implements MailClient.UICallback {
         });
     }
 
-    public void setEmailAddress(String emailAddress) {
-        if (emailAddress.contains(",")) {
-            emailAddress = emailAddress.split(",")[0].trim();
-        }
-        mailClient.getMailbox().setEmailAddress(emailAddress);
-        emailAddressLabel.setText(emailAddress);
+    public void shutdown() {
+        executorService.shutdown();
     }
 }

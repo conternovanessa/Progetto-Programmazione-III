@@ -13,75 +13,40 @@ import java.util.concurrent.Executors;
 public class MailClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
-    private static final int POLLING_INTERVAL = 1000;
 
     private final Mailbox mailbox;
     private final ExecutorService executorService;
     private final BooleanProperty connectedProperty;
-    private final UICallback uiCallback;
-    private String currentFilter = "Email ricevute";
     private volatile boolean isShuttingDown = false;
 
-    // Interfaccia per callback UI
-    public interface UICallback {
-        void updateEmailList(List<Email> emails);
-        void handleError(String message);
-        void handleNewEmails(List<Email> emails, String filter);
-        void updateConnectionStatus(boolean connected);
-    }
-
-    public MailClient(String emailAddress, UICallback uiCallback) {
+    public MailClient(String emailAddress) {
+        // Rimuovi la porta se presente nell'indirizzo email
         if (emailAddress.contains(",")) {
             emailAddress = emailAddress.split(",")[0].trim();
         }
         this.mailbox = new Mailbox(emailAddress);
         this.executorService = Executors.newCachedThreadPool();
         this.connectedProperty = new SimpleBooleanProperty(false);
-        this.uiCallback = uiCallback;
     }
 
-    // Metodi di gestione connessione
-    public void startConnectionChecker() {
-        // Controllo immediato
-        checkConnection();
 
-        executorService.submit(() -> {
-            while (!isShuttingDown) {
-                try {
-                    Thread.sleep(POLLING_INTERVAL);
-                    checkConnection();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        });
+    public BooleanProperty connectedProperty() {
+        return connectedProperty;
     }
 
+    public boolean isConnected() {
+        return connectedProperty.get();
+    }
 
     public void checkConnection() {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, "PING");
             String response = (String) NetworkUtils.receiveObject(socket);
-            boolean isConnected = "PONG".equals(response);
-            connectedProperty.set(isConnected);
-            uiCallback.updateConnectionStatus(isConnected);
+            connectedProperty.set("PONG".equals(response));
         } catch (Exception e) {
             connectedProperty.set(false);
-            uiCallback.updateConnectionStatus(false);
         }
     }
-
-    public void setCurrentFilter(String filter) {
-        this.currentFilter = filter;
-        try {
-            List<Email> emails = fetchEmails(filter);
-            uiCallback.updateEmailList(emails);
-        } catch (Exception e) {
-            uiCallback.handleError("Errore nel cambio filtro email");
-        }
-    }
-
 
     public List<Email> fetchEmails(String filter) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
@@ -97,48 +62,6 @@ public class MailClient {
                 }
             }
             return List.of(); // Return empty list if response is not valid
-        }
-    }
-
-    public void startEmailFetcher() {
-        // Esegui immediatamente il primo fetch
-        try {
-            if (isConnected()) {
-                List<Email> emails = fetchEmails(currentFilter);
-                uiCallback.updateEmailList(emails);
-            }
-        } catch (Exception e) {
-            uiCallback.handleError("Errore nel recupero iniziale delle email");
-        }
-
-        // Avvia il polling
-        executorService.submit(() -> {
-            while (!isShuttingDown) {
-                try {
-                    Thread.sleep(POLLING_INTERVAL);
-                    if (isConnected()) {
-                        List<Email> emails = fetchEmails(currentFilter);
-                        uiCallback.updateEmailList(emails);
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    uiCallback.handleError("Errore nel recupero delle email");
-                }
-            }
-        });
-    }
-
-
-    public void pollForNewEmails() {
-        try {
-            List<Email> newEmails = checkNewEmails();
-            if (newEmails != null && !newEmails.isEmpty()) {
-                uiCallback.handleNewEmails(newEmails, currentFilter);
-            }
-        } catch (Exception e) {
-            uiCallback.handleError("Errore nel controllo nuove email");
         }
     }
 
@@ -158,22 +81,30 @@ public class MailClient {
 
     public String sendEmail(Email email) throws IOException, ClassNotFoundException {
         try (Socket controlSocket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            // Step 1: Request write socket
             NetworkUtils.sendObject(controlSocket, "REQUEST_WRITE_SOCKET");
-            NetworkUtils.sendObject(controlSocket, mailbox.getEmailAddress());
+            NetworkUtils.sendObject(controlSocket, mailbox.getEmailAddress());  // Send user email
 
+            // Step 2: Get dedicated port
             int dedicatedPort = (int) NetworkUtils.receiveObject(controlSocket);
             if (dedicatedPort == -1) {
                 throw new IOException("Server failed to allocate dedicated port");
             }
 
+            // Step 3: Use dedicated socket for email transmission
             try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
                 NetworkUtils.sendObject(dedicatedSocket, email);
                 NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
-                return (String) NetworkUtils.receiveObject(dedicatedSocket);
+                String response = (String) NetworkUtils.receiveObject(dedicatedSocket);
+
+                // Step 4: Handle response
+                if (response.startsWith("ERROR")) {
+                    throw new IOException(response.substring(7));
+                }
+                return response;
             }
         }
     }
-
 
 
     public Email createReplyEmail(String action, int emailId) throws IOException, ClassNotFoundException {
@@ -221,14 +152,6 @@ public class MailClient {
         }
     }
 
-    public BooleanProperty connectedProperty() {
-        return connectedProperty;
-    }
-
-    public boolean isConnected() {
-        return connectedProperty.get();
-    }
-
     public Mailbox getMailbox() {
         return mailbox;
     }
@@ -237,6 +160,4 @@ public class MailClient {
         isShuttingDown = true;
         executorService.shutdown();
     }
-
-
 }
