@@ -28,26 +28,20 @@ public class MailServer {
     public void loadExistingEmails() {
         serverLock.writeLock().lock();
         try {
-            List<String> emailAddresses = EmailFileManager.loadValidEmails()
-                    .stream()
-                    .map(email -> email.contains(",") ?
-                            email.substring(0, email.indexOf(",")).trim() :
-                            email.trim())
-                    .collect(Collectors.toList());
+            List<String> emailAddresses = EmailFileManager.loadValidEmails();
 
             for (String emailAddress : emailAddresses) {
                 createAccount(emailAddress);
+
                 try {
                     List<Email> emails = EmailFileManager.loadEmails(emailAddress);
                     EmailAccount account = accounts.get(emailAddress);
 
-                    if (account != null) {
-                        for (Email email : emails) {
-                            if (email.getSender().equals(emailAddress)) {
-                                account.addToSent(email);
-                            } else {
-                                account.addToInbox(email);
-                            }
+                    for (Email email : emails) {
+                        if (email.getSender().equals(emailAddress)) {
+                            account.addToSent(email);
+                        } else {
+                            account.addToInbox(email);
                         }
                     }
                 } catch (IOException e) {
@@ -70,69 +64,56 @@ public class MailServer {
         }
     }
 
-    private void validateEmail(String email) throws IllegalArgumentException {
-        // Check for null or empty
-        if (email == null || email.trim().isEmpty()) {
-            serverController.logEvent("❌ Errore: Email vuota o null");
-            throw new IllegalArgumentException("L'indirizzo email non può essere vuoto");
-        }
-
-        // Check @ presence and position
-        int atIndex = email.indexOf('@');
-        if (atIndex == -1) {
-            serverController.logEvent("❌ Errore: Manca la @ nell'indirizzo " + email);
-            throw new IllegalArgumentException("L'indirizzo email deve contenere @");
-        }
-        if (atIndex == 0 || atIndex == email.length() - 1) {
-            serverController.logEvent("❌ Errore: @ in posizione non valida in " + email);
-            throw new IllegalArgumentException("@ non può essere all'inizio o alla fine dell'indirizzo");
-        }
-
-        // Split and validate parts
-        String[] parts = email.split("@");
-        String username = parts[0];
-        String domain = parts[1];
-
-        // Validate domain
-        if (!"progetto.com".equals(domain)) {
-            serverController.logEvent("❌ Errore: Dominio non valido " + domain);
-            throw new IllegalArgumentException("Il dominio deve essere progetto.com");
-        }
-
-        // Validate username against valid emails
-        try {
-            List<String> validUsernames = EmailFileManager.loadValidEmails()
-                    .stream()
-                    .map(e -> e.split("@")[0])
-                    .collect(Collectors.toList());
-
-            if (!validUsernames.contains(username)) {
-                serverController.logEvent("❌ Errore: Username non valido " + username);
-                throw new IllegalArgumentException("Username non valido. Utenti validi: " + String.join(", ", validUsernames));
-            }
-        } catch (IOException e) {
-            serverController.logEvent("❌ Errore di sistema nella validazione username");
-            throw new RuntimeException("Errore nella verifica dell'username", e);
-        }
-    }
-
-    public void sendEmail(Email email) throws IOException {
+    public void sendEmail(Email email) {
         serverLock.writeLock().lock();
         try {
-            // Step 1: Validate sender and recipients
-            validateEmail(email.getSender());
-            for (String recipient : email.getRecipients()) {
-                validateEmail(recipient);
-            }
-
             String sender = email.getSender();
             List<String> recipients = email.getRecipients();
 
-            // Step 2: Create accounts if needed
+            // Email validation logic
+            for (String recipient : recipients) {
+                int atIndex = recipient.indexOf("@");
+
+                // Controllo presenza @
+                if (atIndex == -1) {
+                    serverController.logEvent("Errore: Email non valida - manca la @ per favore inserire");
+                    throw new IllegalArgumentException("Formato email non valido: manca il dominio, inserire '@dominio.com'");
+                }
+
+                // Controllo posizione @
+                if (atIndex == 0 || atIndex == recipient.length() - 1) {
+                    serverController.logEvent("Errore: Posizione non valida della @ - deve essere in mezzo all'indirizzo email");
+                    throw new IllegalArgumentException("Formato email non valido: la @ deve essere tra username e dominio");
+                }
+
+                String[] parts = recipient.split("@");
+                String username = parts[0];
+                String domain = parts[1];
+
+                if (!"progetto.com".equals(domain)) {
+                    serverController.logEvent("Errore: Dominio non valido - " + domain +" il dominio deve terminare in progetto.com");
+                    throw new IllegalArgumentException("Dominio non valido: " + domain);
+                }
+
+                try {
+                    List<String> validUsernames = EmailFileManager.loadValidEmails()
+                            .stream()
+                            .map(e -> e.split("@")[0])
+                            .collect(Collectors.toList());
+
+                    if (!validUsernames.contains(username)) {
+                        serverController.logEvent("Errore: Username non valido - " + username + " Account validi: fabiodelia , filippoditto, vanessaconterno");
+                        throw new IllegalArgumentException("Username non valido: " + username);
+                    }
+                } catch (IOException e) {
+                    serverController.logEvent("Errore di sistema durante la verifica dell'username");
+                    throw new RuntimeException("Impossibile verificare l'username", e);
+                }
+            }
+
             createAccount(sender);
             recipients.forEach(this::createAccount);
 
-            // Step 3: Process sender's copy
             int sentEmailId = EmailFileManager.getNextId();
             Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
             senderCopy.setId(sentEmailId);
@@ -141,11 +122,9 @@ public class MailServer {
                 EmailFileManager.saveEmail(senderCopy, sender);
                 accounts.get(sender).addToSent(senderCopy);
             } catch (IOException e) {
-                serverController.logEvent("❌ Errore salvataggio email per mittente " + sender + ": " + e.getMessage());
-                throw e;
+                serverController.logEvent("Errore durante il salvataggio dell'email inviata per " + sender + ": " + e.getMessage());
             }
 
-            // Step 4: Process recipients' copies
             for (String recipient : recipients) {
                 int recipientEmailId = EmailFileManager.getNextId();
                 Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
@@ -155,17 +134,15 @@ public class MailServer {
                     EmailFileManager.saveEmail(recipientCopy, recipient);
                     accounts.get(recipient).addToInbox(recipientCopy);
                     queueEmail(recipientCopy, recipient);
-                    serverController.logEvent("📬 Email consegnata a: " + recipient);
+                    serverController.logEvent("📬 Email ricevuta da: " + recipient + " inviata da: " + sender);
                 } catch (IOException e) {
-                    serverController.logEvent("❌ Errore salvataggio email per destinatario " + recipient + ": " + e.getMessage());
-                    throw e;
+                    serverController.logEvent("Errore durante il salvataggio dell'email per " + recipient + ": " + e.getMessage());
                 }
             }
         } finally {
             serverLock.writeLock().unlock();
         }
     }
-
 
 
     private void queueEmail(Email email, String recipient) {
