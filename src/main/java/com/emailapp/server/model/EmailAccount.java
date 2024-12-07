@@ -41,7 +41,6 @@ public class EmailAccount {
         try {
             if (inbox.stream().noneMatch(e -> e.getId() == email.getId())) {
                 inbox.add(email);
-                System.out.println("Added email to inbox for " + emailAddress + ": " + email.getId());
             }
         } finally {
             accountLock.writeLock().unlock();
@@ -53,7 +52,6 @@ public class EmailAccount {
         try {
             if (sent.stream().noneMatch(e -> e.getId() == email.getId())) {
                 sent.add(email);
-                System.out.println("Added email to sent for " + emailAddress + ": " + email.getId());
             }
         } finally {
             accountLock.writeLock().unlock();
