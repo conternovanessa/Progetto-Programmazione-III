@@ -97,10 +97,6 @@ public class MailClient {
                 NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
                 String response = (String) NetworkUtils.receiveObject(dedicatedSocket);
 
-                // Step 4: Handle response
-                if (response.startsWith("ERROR")) {
-                    throw new IOException(response.substring(7));
-                }
                 return response;
             }
         }

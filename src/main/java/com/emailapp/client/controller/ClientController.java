@@ -173,9 +173,7 @@ public class ClientController {
 
         try {
             Email newEmail = createEmailFromFields();
-            System.out.println("Attempting to send email...");
             String response = mailClient.sendEmail(newEmail);
-            System.out.println("Server response: " + response);
 
             if ("OK".equals(response)) {
                 showEmailListView();
@@ -408,8 +406,6 @@ public class ClientController {
         email.setSubject(subjectField.getText().trim());
         email.setBody(bodyArea.getText().trim());
         email.setSentDate(LocalDateTime.now());
-
-        System.out.println("Created email: " + email); // Debug print
         return email;
     }
 
