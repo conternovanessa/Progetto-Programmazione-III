@@ -13,40 +13,75 @@ import java.util.concurrent.Executors;
 public class MailClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
+    private static final int POLLING_INTERVAL = 1000;
 
     private final Mailbox mailbox;
     private final ExecutorService executorService;
     private final BooleanProperty connectedProperty;
+    private final UICallback uiCallback;
+    private String currentFilter = "Email ricevute";
     private volatile boolean isShuttingDown = false;
 
-    public MailClient(String emailAddress) {
-        // Rimuovi la porta se presente nell'indirizzo email
+    // Interfaccia per callback UI
+    public interface UICallback {
+        void updateEmailList(List<Email> emails);
+        void handleError(String message);
+        void handleNewEmails(List<Email> emails, String filter);
+        void updateConnectionStatus(boolean connected);
+    }
+
+    public MailClient(String emailAddress, UICallback uiCallback) {
         if (emailAddress.contains(",")) {
             emailAddress = emailAddress.split(",")[0].trim();
         }
         this.mailbox = new Mailbox(emailAddress);
         this.executorService = Executors.newCachedThreadPool();
         this.connectedProperty = new SimpleBooleanProperty(false);
+        this.uiCallback = uiCallback;
     }
 
+    // Metodi di gestione connessione
+    public void startConnectionChecker() {
+        // Controllo immediato
+        checkConnection();
 
-    public BooleanProperty connectedProperty() {
-        return connectedProperty;
+        executorService.submit(() -> {
+            while (!isShuttingDown) {
+                try {
+                    Thread.sleep(POLLING_INTERVAL);
+                    checkConnection();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
     }
 
-    public boolean isConnected() {
-        return connectedProperty.get();
-    }
 
     public void checkConnection() {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, "PING");
             String response = (String) NetworkUtils.receiveObject(socket);
-            connectedProperty.set("PONG".equals(response));
+            boolean isConnected = "PONG".equals(response);
+            connectedProperty.set(isConnected);
+            uiCallback.updateConnectionStatus(isConnected);
         } catch (Exception e) {
             connectedProperty.set(false);
+            uiCallback.updateConnectionStatus(false);
         }
     }
+
+    public void setCurrentFilter(String filter) {
+        this.currentFilter = filter;
+        try {
+            List<Email> emails = fetchEmails(filter);
+            uiCallback.updateEmailList(emails);
+        } catch (Exception e) {
+            uiCallback.handleError("Errore nel cambio filtro email");
+        }
+    }
+
 
     public List<Email> fetchEmails(String filter) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
@@ -62,6 +97,48 @@ public class MailClient {
                 }
             }
             return List.of(); // Return empty list if response is not valid
+        }
+    }
+
+    public void startEmailFetcher() {
+        // Esegui immediatamente il primo fetch
+        try {
+            if (isConnected()) {
+                List<Email> emails = fetchEmails(currentFilter);
+                uiCallback.updateEmailList(emails);
+            }
+        } catch (Exception e) {
+            uiCallback.handleError("Errore nel recupero iniziale delle email");
+        }
+
+        // Avvia il polling
+        executorService.submit(() -> {
+            while (!isShuttingDown) {
+                try {
+                    Thread.sleep(POLLING_INTERVAL);
+                    if (isConnected()) {
+                        List<Email> emails = fetchEmails(currentFilter);
+                        uiCallback.updateEmailList(emails);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    uiCallback.handleError("Errore nel recupero delle email");
+                }
+            }
+        });
+    }
+
+
+    public void pollForNewEmails() {
+        try {
+            List<Email> newEmails = checkNewEmails();
+            if (newEmails != null && !newEmails.isEmpty()) {
+                uiCallback.handleNewEmails(newEmails, currentFilter);
+            }
+        } catch (Exception e) {
+            uiCallback.handleError("Errore nel controllo nuove email");
         }
     }
 
@@ -144,6 +221,14 @@ public class MailClient {
         }
     }
 
+    public BooleanProperty connectedProperty() {
+        return connectedProperty;
+    }
+
+    public boolean isConnected() {
+        return connectedProperty.get();
+    }
+
     public Mailbox getMailbox() {
         return mailbox;
     }
@@ -152,4 +237,6 @@ public class MailClient {
         isShuttingDown = true;
         executorService.shutdown();
     }
+
+
 }
