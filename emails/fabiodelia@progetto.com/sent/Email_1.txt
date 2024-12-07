@@ -1,0 +1,7 @@
+Id: 1
+From: fabiodelia@progetto.com
+To: vanessaconterno@progetto.com
+Subject: bob
+Date: 2024-12-05T15:35:08.832377800
+Read: false
+Body: invio

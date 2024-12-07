@@ -1,0 +1,15 @@
+Id: 12
+From: filippoditto@progetto.com
+To: fabiodelia@progetto.com
+Subject: Re: test
+Date: 2024-12-04T11:57:33.398865300
+Read: false
+Body: 
+
+----- Messaggio Originale -----
+Da: fabiodelia@progetto.com
+Data: 04/12/2024 11:53:32
+Oggetto: test
+
+srtb
+cuoa

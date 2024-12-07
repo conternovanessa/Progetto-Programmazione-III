@@ -1,0 +1,7 @@
+Id: 11
+From: fabiodelia@progetto.com
+To: filippoditto@progetto.com, vanessaconterno@progetto.com
+Subject: Multy
+Date: 2024-12-04T11:54:21.795728300
+Read: true
+Body: esarger

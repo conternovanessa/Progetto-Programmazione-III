@@ -1,0 +1,7 @@
+Id: 12
+From: filippoditto@progetto.com
+To: fabiodelia@progetto.com
+Subject: fil
+Date: 2024-12-06T18:07:03.633155100
+Read: true
+Body: erggr

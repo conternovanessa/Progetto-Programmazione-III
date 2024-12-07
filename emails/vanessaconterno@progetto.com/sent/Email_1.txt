@@ -1,0 +1,7 @@
+Id: 1
+From: vanessaconterno@progetto.com
+To: filippoditto@progetto.com
+Subject: test
+Date: 2024-12-06T17:20:14.269344800
+Read: false
+Body: ewrgge

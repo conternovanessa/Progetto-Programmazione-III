@@ -1,0 +1,7 @@
+Id: 8
+From: fabiodelia@progetto.com
+To: filippoditto@progetto.com
+Subject: test
+Date: 2024-12-04T11:53:32.303469500
+Read: true
+Body: srtb
