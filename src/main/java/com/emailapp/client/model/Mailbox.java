@@ -102,12 +102,18 @@ public class Mailbox {
     }
 
     public void setEmailAddress(String emailAddress) {
+        // Rimuovi la porta se presente nell'indirizzo email
+        if (emailAddress.contains(",")) {
+            emailAddress = emailAddress.split(",")[0].trim();
+        }
+
         if (!this.emailAddress.equals(emailAddress)) {
             this.emailAddress = emailAddress;
             clearAllEmails();
             loadEmailsFromDisk();
         }
     }
+
 
     public void setEmailLoadedCallback(Runnable callback) {
         this.emailLoadedCallback = callback;

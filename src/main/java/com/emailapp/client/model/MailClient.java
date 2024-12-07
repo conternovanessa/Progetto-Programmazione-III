@@ -20,10 +20,15 @@ public class MailClient {
     private volatile boolean isShuttingDown = false;
 
     public MailClient(String emailAddress) {
+        // Rimuovi la porta se presente nell'indirizzo email
+        if (emailAddress.contains(",")) {
+            emailAddress = emailAddress.split(",")[0].trim();
+        }
         this.mailbox = new Mailbox(emailAddress);
         this.executorService = Executors.newCachedThreadPool();
         this.connectedProperty = new SimpleBooleanProperty(false);
     }
+
 
     public BooleanProperty connectedProperty() {
         return connectedProperty;

@@ -67,9 +67,14 @@ public class ClientController {
     }
 
     public void setEmailAddress(String emailAddress) {
+        // Rimuovi la porta se presente nell'indirizzo email
+        if (emailAddress.contains(",")) {
+            emailAddress = emailAddress.split(",")[0].trim();
+        }
         mailClient.getMailbox().setEmailAddress(emailAddress);
         emailAddressLabel.setText(emailAddress);
     }
+
 
     private void setupConnectionListener() {
         mailClient.connectedProperty().addListener((observable, oldValue, newValue) -> {

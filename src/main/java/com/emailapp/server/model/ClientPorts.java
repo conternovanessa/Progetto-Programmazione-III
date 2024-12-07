@@ -28,7 +28,7 @@ public class ClientPorts {
     }
 
     public static int getControlPort() {
-        return 5000; // Porta principale del server
+        return 5000;
     }
 
     public static int getPortForClient(String email) {
