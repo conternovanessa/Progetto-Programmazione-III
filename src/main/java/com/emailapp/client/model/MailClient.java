@@ -81,26 +81,22 @@ public class MailClient {
 
     public String sendEmail(Email email) throws IOException, ClassNotFoundException {
         try (Socket controlSocket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            // Step 1: Request write socket
             NetworkUtils.sendObject(controlSocket, "REQUEST_WRITE_SOCKET");
-            NetworkUtils.sendObject(controlSocket, mailbox.getEmailAddress());  // Send user email
+            NetworkUtils.sendObject(controlSocket, mailbox.getEmailAddress());
 
-            // Step 2: Get dedicated port
             int dedicatedPort = (int) NetworkUtils.receiveObject(controlSocket);
             if (dedicatedPort == -1) {
                 throw new IOException("Server failed to allocate dedicated port");
             }
 
-            // Step 3: Use dedicated socket for email transmission
             try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
                 NetworkUtils.sendObject(dedicatedSocket, email);
                 NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
-                String response = (String) NetworkUtils.receiveObject(dedicatedSocket);
-
-                return response;
+                return (String) NetworkUtils.receiveObject(dedicatedSocket);
             }
         }
     }
+
 
 
     public Email createReplyEmail(String action, int emailId) throws IOException, ClassNotFoundException {
