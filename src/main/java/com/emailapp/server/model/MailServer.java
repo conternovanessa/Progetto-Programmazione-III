@@ -28,20 +28,26 @@ public class MailServer {
     public void loadExistingEmails() {
         serverLock.writeLock().lock();
         try {
-            List<String> emailAddresses = EmailFileManager.loadValidEmails();
+            List<String> emailAddresses = EmailFileManager.loadValidEmails()
+                    .stream()
+                    .map(email -> email.contains(",") ?
+                            email.substring(0, email.indexOf(",")).trim() :
+                            email.trim())
+                    .collect(Collectors.toList());
 
             for (String emailAddress : emailAddresses) {
                 createAccount(emailAddress);
-
                 try {
                     List<Email> emails = EmailFileManager.loadEmails(emailAddress);
                     EmailAccount account = accounts.get(emailAddress);
 
-                    for (Email email : emails) {
-                        if (email.getSender().equals(emailAddress)) {
-                            account.addToSent(email);
-                        } else {
-                            account.addToInbox(email);
+                    if (account != null) {
+                        for (Email email : emails) {
+                            if (email.getSender().equals(emailAddress)) {
+                                account.addToSent(email);
+                            } else {
+                                account.addToInbox(email);
+                            }
                         }
                     }
                 } catch (IOException e) {

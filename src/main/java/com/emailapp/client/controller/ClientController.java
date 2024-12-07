@@ -180,9 +180,13 @@ public class ClientController {
                 showInfoAlert("Email Inviata", "Email inviata con successo");
                 filterEmails(currentFilter);
             } else {
-                showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
+                String errorMsg = response.startsWith("ERROR: ") ?
+                        response.substring(7) : "Errore sconosciuto";
+                showErrorAlert("Errore", "Impossibile inviare l'email: " + errorMsg);
             }
         } catch (Exception e) {
+            System.err.println("Error sending email: " + e.getMessage());
+            e.printStackTrace();
             handleConnectionError();
         }
     }
