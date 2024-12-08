@@ -168,55 +168,17 @@ public class ClientController implements EmailUpdateListener {
     }
 
     private void handleEmailSelection(Email email) {
-        if (!mailClient.isConnected()) {
-            showErrorAlert("Server non raggiungibile", "Impossibile aprire l'email: server non disponibile");
-            return;
-        }
-
         try {
-            System.out.println("Selecting email: ID=" + email.getId() + ", Read before=" + email.isRead()); // Debug log
-
-            if (!email.isRead()) {
-                mailClient.markEmailAsRead(email);
-            }
-
-            // Update the UI immediately
-            email.setRead(true);
-            emailTableView.refresh();
-
-            // Show email details
+            mailClient.handleEmailRead(email);
             displayEmailDetails(email);
-
-            System.out.println("Email read status after: " + email.isRead()); // Debug log
         } catch (Exception e) {
-            e.printStackTrace();
             showErrorAlert("Errore", "Impossibile aprire l'email");
         }
     }
 
-
-
     private void filterEmails(String filter) {
-        if (!mailClient.isConnected()) {
-            showErrorAlert("Server Disconnesso", "Impossibile filtrare le email: server non raggiungibile");
-            return;
-        }
-
         try {
-            List<Email> emails = mailClient.fetchEmails(filter);
-            Platform.runLater(() -> {
-                mailClient.getMailbox().clearEmails();
-                if (emails != null) {
-                    if (filter.equals("Email inviate")) {
-                        emails.forEach(mailClient.getMailbox()::addSentEmail);
-                        emailTableView.setItems(mailClient.getMailbox().getSentEmails());
-                    } else {
-                        emails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                        emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
-                    }
-                    emailTableView.refresh();
-                }
-            });
+            mailClient.handleEmailFiltering(filter);
         } catch (Exception e) {
             handleConnectionError();
         }
@@ -232,20 +194,9 @@ public class ClientController implements EmailUpdateListener {
 
     @FXML
     private void handleSendEmail() {
-        if (!mailClient.isConnected()) {
-            showErrorAlert("Server Disconnesso", "Impossibile inviare l'email: server non raggiungibile");
-            return;
-        }
-
         try {
             String[] recipients = toField.getText().split("\\s*,\\s*");
-            Email newEmail = mailClient.createEmail(
-                    mailClient.getMailbox().getEmailAddress(),
-                    Arrays.asList(recipients),
-                    subjectField.getText(),
-                    bodyArea.getText()
-            );
-            String response = mailClient.sendEmail(newEmail);
+            String response = mailClient.handleEmailSend(recipients, subjectField.getText(), bodyArea.getText());
 
             if ("OK".equals(response)) {
                 showEmailListView();

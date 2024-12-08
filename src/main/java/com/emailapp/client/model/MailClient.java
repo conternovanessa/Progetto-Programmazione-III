@@ -5,6 +5,7 @@ import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javafx.beans.property.BooleanProperty;
@@ -139,6 +140,54 @@ public class MailClient {
                 NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
                 return (String) NetworkUtils.receiveObject(dedicatedSocket);
             }
+        }
+    }
+
+    public void handleEmailFiltering(String filter) throws Exception {
+        if (!isConnected()) {
+            throw new Exception("Server non raggiungibile");
+        }
+        List<Email> emails = fetchEmails(filter);
+        mailbox.clearEmails();
+        if (emails != null) {
+            if (filter.equals(SENT_EMAILS)) {
+                emails.forEach(mailbox::addSentEmail);
+            } else {
+                emails.forEach(mailbox::addReceivedEmail);
+            }
+            notifyEmailsFiltered(filter, emails);
+        }
+    }
+
+    // Move email read handling here
+    public void handleEmailRead(Email email) throws Exception {
+        if (!email.isRead()) {
+            markEmailAsRead(email);
+            mailbox.updateEmailReadStatus(email);
+            notifyEmailMarkedAsRead(email);
+        }
+    }
+
+    // Move email sending logic here
+    public String handleEmailSend(String[] recipients, String subject, String body) throws Exception {
+        Email newEmail = createEmail(
+                mailbox.getEmailAddress(),
+                Arrays.asList(recipients),
+                subject,
+                body
+        );
+        return sendEmail(newEmail);
+    }
+
+    private void notifyEmailsFiltered(String filter, List<Email> emails) {
+        for (EmailUpdateListener listener : listeners) {
+            listener.onEmailsFiltered(filter, emails);
+        }
+    }
+
+    private void notifyEmailMarkedAsRead(Email email) {
+        for (EmailUpdateListener listener : listeners) {
+            listener.onEmailMarkedAsRead(email);
         }
     }
 
