@@ -108,14 +108,56 @@ public class ClientController implements EmailUpdateListener {
     private void setupEmailTableView() {
         TableColumn<Email, String> senderColumn = new TableColumn<>("From");
         senderColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSender()));
-
+        senderColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    Email email = getTableView().getItems().get(getIndex());
+                    setText(item);
+                    setStyle(email.isRead() ? "" : "-fx-font-weight: bold;");
+                    System.out.println("Updating cell style for email " + email.getId() + ", read=" + email.isRead()); // Debug
+                }
+            }
+        });
         TableColumn<Email, String> subjectColumn = new TableColumn<>("Subject");
         subjectColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSubject()));
+        subjectColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    Email email = getTableView().getItems().get(getIndex());
+                    setStyle(email.isRead() ? "" : "-fx-font-weight: bold;");
+                }
+            }
+        });
 
         TableColumn<Email, String> dateColumn = new TableColumn<>("Date");
         dateColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().getSentDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
         ));
+        dateColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    Email email = getTableView().getItems().get(getIndex());
+                    setStyle(email.isRead() ? "" : "-fx-font-weight: bold;");
+                }
+            }
+        });
 
         emailTableView.getColumns().setAll(senderColumn, subjectColumn, dateColumn);
         emailTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
@@ -132,12 +174,27 @@ public class ClientController implements EmailUpdateListener {
         }
 
         try {
-            mailClient.markEmailAsRead(email);
+            System.out.println("Selecting email: ID=" + email.getId() + ", Read before=" + email.isRead()); // Debug log
+
+            if (!email.isRead()) {
+                mailClient.markEmailAsRead(email);
+            }
+
+            // Update the UI immediately
+            email.setRead(true);
+            emailTableView.refresh();
+
+            // Show email details
             displayEmailDetails(email);
+
+            System.out.println("Email read status after: " + email.isRead()); // Debug log
         } catch (Exception e) {
+            e.printStackTrace();
             showErrorAlert("Errore", "Impossibile aprire l'email");
         }
     }
+
+
 
     private void filterEmails(String filter) {
         if (!mailClient.isConnected()) {
@@ -505,4 +562,34 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
+
+    @Override
+    public void onEmailMarkedAsRead(Email email) {
+        Platform.runLater(() -> {
+            System.out.println("Email marked as read: ID=" + email.getId()); // Debug log
+
+            // Update mailbox
+            mailClient.getMailbox().updateEmailReadStatus(email);
+
+            // Refresh the specific row
+            refreshTableRow(email);
+
+            // Update details if this is the currently displayed email
+            if (currentDisplayedEmail != null && currentDisplayedEmail.getId() == email.getId()) {
+                displayEmailDetails(email);
+            }
+        });
+    }
+    private void refreshTableRow(Email email) {
+        Platform.runLater(() -> {
+            int index = emailTableView.getItems().indexOf(email);
+            if (index >= 0) {
+                emailTableView.getItems().set(index, email);
+                emailTableView.refresh();
+            }
+        });
+    }
+
+
+
 }
