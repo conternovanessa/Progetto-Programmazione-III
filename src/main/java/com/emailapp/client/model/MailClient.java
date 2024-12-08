@@ -3,6 +3,7 @@ package com.emailapp.client.model;
 import com.emailapp.util.NetworkUtils;
 import java.io.*;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import javafx.beans.property.BooleanProperty;
@@ -99,7 +100,7 @@ public class MailClient {
 
 
 
-    public Email createReplyEmail(String action, int emailId) throws IOException, ClassNotFoundException {
+    public Email createActionEmail(String action, int emailId) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, action); // "REPLY" or "REPLY_ALL" or "FORWARD"
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
@@ -113,6 +114,16 @@ public class MailClient {
             }
             throw new IOException("Failed to create reply email");
         }
+    }
+
+    public Email createEmail(String sender, List<String> recipients, String subject, String body) {
+        Email email = new Email();
+        email.setSender(sender);
+        email.setRecipients(recipients);
+        email.setSubject(subject.trim());
+        email.setBody(body.trim());
+        email.setSentDate(LocalDateTime.now());
+        return email;
     }
 
     public void deleteEmail(String emailId) throws IOException, ClassNotFoundException {

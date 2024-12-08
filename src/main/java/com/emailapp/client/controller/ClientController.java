@@ -172,7 +172,13 @@ public class ClientController {
         }
 
         try {
-            Email newEmail = createEmailFromFields();
+            String[] recipients = toField.getText().split("\\s*,\\s*");
+            Email newEmail = mailClient.createEmail(
+                    mailClient.getMailbox().getEmailAddress(),
+                    Arrays.asList(recipients),
+                    subjectField.getText(),
+                    bodyArea.getText()
+            );
             String response = mailClient.sendEmail(newEmail);
 
             if ("OK".equals(response)) {
@@ -196,7 +202,7 @@ public class ClientController {
         }
 
         try {
-            Email replyTemplate = mailClient.createReplyEmail("REPLY",currentDisplayedEmail.getId());
+            Email replyTemplate = mailClient.createActionEmail("REPLY",currentDisplayedEmail.getId());
             populateComposeFields(replyTemplate);
             showComposeView();
         } catch (Exception e) {
@@ -212,7 +218,7 @@ public class ClientController {
         }
 
         try {
-            Email replyAllTemplate = mailClient.createReplyEmail("REPLY_ALL",currentDisplayedEmail.getId());
+            Email replyAllTemplate = mailClient.createActionEmail("REPLY_ALL",currentDisplayedEmail.getId());
             populateComposeFields(replyAllTemplate);
             showComposeView();
         } catch (Exception e) {
@@ -228,7 +234,7 @@ public class ClientController {
         }
 
         try {
-            Email forwardTemplate = mailClient.createReplyEmail("FORWARD", currentDisplayedEmail.getId());
+            Email forwardTemplate = mailClient.createActionEmail("FORWARD", currentDisplayedEmail.getId());
             populateComposeFields(forwardTemplate);
             showComposeView();
         } catch (Exception e) {
@@ -389,20 +395,6 @@ public class ClientController {
             filterEmails(currentFilter);
             emailTableView.refresh();
         });
-    }
-
-    private Email createEmailFromFields() {
-        Email email = new Email();
-        email.setSender(mailClient.getMailbox().getEmailAddress());
-
-        // Split and trim recipients
-        String[] recipients = toField.getText().split("\\s*,\\s*");
-        email.setRecipients(Arrays.asList(recipients));
-
-        email.setSubject(subjectField.getText().trim());
-        email.setBody(bodyArea.getText().trim());
-        email.setSentDate(LocalDateTime.now());
-        return email;
     }
 
 
