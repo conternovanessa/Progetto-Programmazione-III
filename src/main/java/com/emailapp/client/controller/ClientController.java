@@ -1,6 +1,7 @@
 package com.emailapp.client.controller;
 
 import com.emailapp.client.model.Email;
+import com.emailapp.client.model.EmailUpdateListener;
 import com.emailapp.client.model.MailClient;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -23,7 +24,7 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class ClientController {
+public class ClientController implements EmailUpdateListener {
     private static final int POLLING_INTERVAL = 1000;
 
     @FXML private Label emailAddressLabel;
@@ -60,6 +61,7 @@ public class ClientController {
             startConnectionChecker();
             setupEmailTableView();
             setupEmailFilter();
+            mailClient.addEmailUpdateListener(this);
             startEmailFetcher();
             startPolling();
             initialLoadCompleted = true;
@@ -449,5 +451,31 @@ public class ClientController {
 
     public void shutdown() {
         executorService.shutdown();
+    }
+
+    @Override
+    public void onNewEmailsReceived(List<Email> newEmails) {
+        Platform.runLater(() -> {
+            boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
+            boolean wasComposeViewVisible = composeView.isVisible();
+            Email selectedEmail = currentDisplayedEmail;
+
+            if (currentFilter.equals("Email ricevute")) {
+                newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
+                emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
+                emailTableView.refresh();
+            }
+
+            if (wasDetailViewVisible && selectedEmail != null) {
+                displayEmailDetails(selectedEmail);
+            } else if (wasComposeViewVisible) {
+                showComposeView();
+            }
+        });
+    }
+
+    @Override
+    public void onEmailUpdateError(Exception e) {
+        handleConnectionError();
     }
 }

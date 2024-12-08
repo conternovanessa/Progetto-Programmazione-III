@@ -4,6 +4,7 @@ import com.emailapp.util.NetworkUtils;
 import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import javafx.beans.property.BooleanProperty;
@@ -19,6 +20,7 @@ public class MailClient {
     private final ExecutorService executorService;
     private final BooleanProperty connectedProperty;
     private volatile boolean isShuttingDown = false;
+    private List<EmailUpdateListener> listeners = new ArrayList<>();
 
     public MailClient(String emailAddress) {
         // Rimuovi la porta se presente nell'indirizzo email
@@ -30,6 +32,28 @@ public class MailClient {
         this.connectedProperty = new SimpleBooleanProperty(false);
     }
 
+    public void addEmailUpdateListener(EmailUpdateListener listener) {
+        listeners.add(listener);
+    }
+
+    public void removeEmailUpdateListener(EmailUpdateListener listener) {
+        listeners.remove(listener);
+    }
+
+    public void pollForNewEmails() {
+        try {
+            List<Email> newEmails = checkNewEmails(); // questo metodo già esiste
+            if (newEmails != null && !newEmails.isEmpty()) {
+                for (EmailUpdateListener listener : listeners) {
+                    listener.onNewEmailsReceived(newEmails);
+                }
+            }
+        } catch (Exception e) {
+            for (EmailUpdateListener listener : listeners) {
+                listener.onEmailUpdateError(e);
+            }
+        }
+    }
 
     public BooleanProperty connectedProperty() {
         return connectedProperty;
