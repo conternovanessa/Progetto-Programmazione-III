@@ -21,6 +21,8 @@ public class MailClient {
     private final BooleanProperty connectedProperty;
     private volatile boolean isShuttingDown = false;
     private List<EmailUpdateListener> listeners = new ArrayList<>();
+    public static final String RECEIVED_EMAILS = "Email ricevute";
+    public static final String SENT_EMAILS = "Email inviate";
 
     public MailClient(String emailAddress) {
         // Rimuovi la porta se presente nell'indirizzo email
@@ -38,6 +40,24 @@ public class MailClient {
 
     public void removeEmailUpdateListener(EmailUpdateListener listener) {
         listeners.remove(listener);
+    }
+
+    public void filterEmails(String filter) throws Exception {
+        if (!isConnected()) {
+            throw new Exception("Server non raggiungibile");
+        }
+
+        try {
+            List<Email> emails = fetchEmails(filter);
+            // Notifichiamo i listener del cambio di filtro
+            for (EmailUpdateListener listener : listeners) {
+                listener.onEmailsFiltered(filter, emails);
+            }
+        } catch (Exception e) {
+            for (EmailUpdateListener listener : listeners) {
+                listener.onEmailUpdateError(e);
+            }
+        }
     }
 
     public void pollForNewEmails() {

@@ -88,12 +88,19 @@ public class ClientController implements EmailUpdateListener {
     }
 
     private void setupEmailFilter() {
-        emailFilterComboBox.getItems().addAll("Email ricevute", "Email inviate");
+        emailFilterComboBox.getItems().addAll(
+                MailClient.RECEIVED_EMAILS,
+                MailClient.SENT_EMAILS
+        );
         emailFilterComboBox.setValue(currentFilter);
         emailFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
                 currentFilter = newVal;
-                filterEmails(newVal);
+                try {
+                    mailClient.filterEmails(newVal);
+                } catch (Exception e) {
+                    handleConnectionError();
+                }
             }
         });
     }
@@ -394,8 +401,11 @@ public class ClientController implements EmailUpdateListener {
 
     private void refreshEmailList() {
         Platform.runLater(() -> {
-            filterEmails(currentFilter);
-            emailTableView.refresh();
+            try {
+                mailClient.filterEmails(currentFilter);
+            } catch (Exception e) {
+                handleConnectionError();
+            }
         });
     }
 
@@ -477,5 +487,22 @@ public class ClientController implements EmailUpdateListener {
     @Override
     public void onEmailUpdateError(Exception e) {
         handleConnectionError();
+    }
+
+    @Override
+    public void onEmailsFiltered(String filter, List<Email> emails) {
+        Platform.runLater(() -> {
+            mailClient.getMailbox().clearEmails();
+            if (emails != null) {
+                if (filter.equals(MailClient.SENT_EMAILS)) {
+                    emails.forEach(mailClient.getMailbox()::addSentEmail);
+                    emailTableView.setItems(mailClient.getMailbox().getSentEmails());
+                } else {
+                    emails.forEach(mailClient.getMailbox()::addReceivedEmail);
+                    emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
+                }
+                emailTableView.refresh();
+            }
+        });
     }
 }
