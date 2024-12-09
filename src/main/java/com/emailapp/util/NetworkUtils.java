@@ -8,62 +8,76 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NetworkUtils {
-    private static ObjectOutputStream getOutputStream(Socket socket) throws IOException {
-        OutputStream os = socket.getOutputStream();
-        if (os instanceof ObjectOutputStream) {
-            return (ObjectOutputStream) os;
-        } else {
-            return new ObjectOutputStream(os);
-        }
+    private static final int SOCKET_TIMEOUT = 30000; // 30 secondi timeout
+
+    private static ObjectOutputStream createOutputStream(Socket socket) throws IOException {
+        socket.setSoTimeout(SOCKET_TIMEOUT);
+        return new ObjectOutputStream(socket.getOutputStream());
     }
 
-    private static ObjectInputStream getInputStream(Socket socket) throws IOException {
-        InputStream is = socket.getInputStream();
-        if (is instanceof ObjectInputStream) {
-            return (ObjectInputStream) is;
-        } else {
-            return new ObjectInputStream(is);
-        }
+    private static ObjectInputStream createInputStream(Socket socket) throws IOException {
+        return new ObjectInputStream(socket.getInputStream());
     }
 
     public static void sendObject(Socket socket, Object obj) throws IOException {
-        if (socket.isClosed()) {
-            throw new SocketException("Socket chiusa");
+        if (socket == null || socket.isClosed()) {
+            throw new SocketException("Socket non valida o chiusa");
         }
-        ObjectOutputStream out = getOutputStream(socket);
-        out.writeObject(obj);
-        out.flush();
-    }
 
-    public static Object receiveObject(Socket socket) throws IOException, ClassNotFoundException {
-        if (socket.isClosed()) {
-            throw new SocketException("Socket chiusa");
-        }
+        ObjectOutputStream out = null;
         try {
-            ObjectInputStream in = getInputStream(socket);
-            return in.readObject();
-        } catch (EOFException e) {
-            throw new SocketException("Connessione chiusa durante la lettura");
-        } catch (SocketTimeoutException e) {
-            throw new SocketException("Timeout durante l'attesa della risposta del server");
-        }
-    }
-
-    public static List<Email> fetchEmails(String serverAddress, int serverPort, String emailAddress) throws IOException {
-        try (Socket socket = new Socket(serverAddress, serverPort)) {
-            sendObject(socket, "FETCH_EMAILS");
-            sendObject(socket, emailAddress);
-
-            try {
-                Object response = receiveObject(socket);
-                if (response instanceof List<?>) {
-                    return (List<Email>) response;
-                }
-                return new ArrayList<>();
-            } catch (ClassNotFoundException e) {
-                throw new IOException("Error receiving emails from server", e);
+            out = createOutputStream(socket);
+            out.writeObject(obj);
+            out.flush();
+        } finally {
+            // Non chiudiamo l'output stream qui per permettere riutilizzo della socket
+            if (out != null) {
+                out.flush();
             }
         }
     }
 
+    public static Object receiveObject(Socket socket) throws IOException, ClassNotFoundException {
+        if (socket == null || socket.isClosed()) {
+            throw new SocketException("Socket non valida o chiusa");
+        }
+
+        ObjectInputStream in = null;
+        try {
+            in = createInputStream(socket);
+            return in.readObject();
+        } catch (EOFException e) {
+            throw new SocketException("Connessione terminata dal server");
+        } catch (SocketTimeoutException e) {
+            throw new SocketException("Timeout nella lettura dal server");
+        }
+    }
+
+    public static List<Email> fetchEmails(String serverAddress, int serverPort, String emailAddress) throws IOException {
+        Socket socket = null;
+        try {
+            socket = new Socket(serverAddress, serverPort);
+            socket.setSoTimeout(SOCKET_TIMEOUT);
+
+            sendObject(socket, "FETCH_EMAILS");
+            sendObject(socket, emailAddress);
+
+            Object response = receiveObject(socket);
+            if (response instanceof List<?>) {
+                return (List<Email>) response;
+            }
+            return new ArrayList<>();
+
+        } catch (ClassNotFoundException e) {
+            throw new IOException("Errore nella deserializzazione delle email", e);
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    // Log dell'errore
+                }
+            }
+        }
+    }
 }
