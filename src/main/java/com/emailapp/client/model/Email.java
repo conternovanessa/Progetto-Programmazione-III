@@ -1,5 +1,6 @@
 package com.emailapp.client.model;
 
+import javafx.beans.property.SimpleBooleanProperty;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,10 +13,12 @@ public class Email implements Serializable {
     private String body;
     private LocalDateTime sentDate;
     private boolean read;
+    private transient SimpleBooleanProperty readProperty;
 
     public Email() {
         this.sentDate = LocalDateTime.now();
         this.read = false;
+        this.readProperty = new SimpleBooleanProperty(false);
     }
 
     public Email(String sender, List<String> recipients, String subject, String body) {
@@ -25,6 +28,7 @@ public class Email implements Serializable {
         this.body = body;
         this.sentDate = LocalDateTime.now();
         this.read = false;
+        this.readProperty = new SimpleBooleanProperty(false);
     }
 
     public int getId() {
@@ -76,11 +80,25 @@ public class Email implements Serializable {
     }
 
     public boolean isRead() {
-        return read;
+        if (readProperty == null) {
+            readProperty = new SimpleBooleanProperty(read);
+        }
+        return readProperty.get();
     }
 
     public void setRead(boolean read) {
         this.read = read;
+        if (readProperty == null) {
+            readProperty = new SimpleBooleanProperty();
+        }
+        this.readProperty.set(read);
+    }
+
+    public SimpleBooleanProperty readProperty() {
+        if (readProperty == null) {
+            readProperty = new SimpleBooleanProperty(read);
+        }
+        return readProperty;
     }
 
     @Override

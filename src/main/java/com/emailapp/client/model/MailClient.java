@@ -1,5 +1,6 @@
 package com.emailapp.client.model;
 
+import com.emailapp.util.EmailFileManager;
 import com.emailapp.util.NetworkUtils;
 import java.io.*;
 import java.net.Socket;
@@ -159,14 +160,20 @@ public class MailClient {
         }
     }
 
-    // Move email read handling here
-    public void handleEmailRead(Email email) throws Exception {
+    public void handleEmailRead(Email email) {
         if (!email.isRead()) {
-            markEmailAsRead(email);
-            mailbox.updateEmailReadStatus(email);
-            notifyEmailMarkedAsRead(email);
+            email.setRead(true);
+            try {
+                EmailFileManager.updateEmailReadStatus(email, mailbox.getEmailAddress());
+                mailbox.updateEmailReadStatus(email);
+                notifyEmailMarkedAsRead(email);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
+
+
 
     // Move email sending logic here
     public String handleEmailSend(String[] recipients, String subject, String body) throws Exception {

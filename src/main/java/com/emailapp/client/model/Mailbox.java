@@ -116,18 +116,21 @@ public class Mailbox {
 
 
     public void updateEmailReadStatus(Email email) {
-        // Aggiorna nelle email ricevute
-        int indexReceived = receivedEmails.indexOf(email);
-        if (indexReceived >= 0) {
-            receivedEmails.get(indexReceived).setRead(true);
+        for (Email e : receivedEmails) {
+            if (e.getId() == email.getId()) {
+                e.setRead(true);
+                break;
+            }
         }
 
-        // Aggiorna nelle email inviate
-        int indexSent = sentEmails.indexOf(email);
-        if (indexSent >= 0) {
-            sentEmails.get(indexSent).setRead(true);
+        for (Email e : sentEmails) {
+            if (e.getId() == email.getId()) {
+                e.setRead(true);
+                break;
+            }
         }
     }
+
 
 
     public void setEmailLoadedCallback(Runnable callback) {

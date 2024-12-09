@@ -162,6 +162,21 @@ public class EmailFileManager {
         }
     }
 
+    public static void updateEmailReadStatus(Email email, String userEmail) throws IOException {
+        Path inboxFile = Paths.get(BASE_DIR, userEmail, INBOX_DIR, "Email_" + email.getId() + ".txt");
+        if (Files.exists(inboxFile)) {
+            List<String> lines = Files.readAllLines(inboxFile);
+            for (int i = 0; i < lines.size(); i++) {
+                if (lines.get(i).startsWith("Read:")) {
+                    lines.set(i, "Read: true");
+                    break;
+                }
+            }
+            Files.write(inboxFile, lines);
+        }
+    }
+
+
     private static void updateEmailReadStatus(Path filePath) throws IOException {
         List<String> lines = Files.readAllLines(filePath);
         for (int i = 0; i < lines.size(); i++) {
