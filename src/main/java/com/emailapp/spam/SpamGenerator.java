@@ -1,6 +1,6 @@
 package com.emailapp.spam;
 
-import com.emailapp.client.model.Email;
+import com.emailapp.util.Email;
 import com.emailapp.util.NetworkUtils;
 
 import javax.swing.*;

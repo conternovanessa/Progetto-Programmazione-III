@@ -1,5 +1,7 @@
 package com.emailapp.client.model;
 
+import com.emailapp.util.Email;
+
 import java.util.List;
 
 public interface EmailUpdateListener {

@@ -1,5 +1,6 @@
 package com.emailapp.client.model;
 
+import com.emailapp.util.Email;
 import com.emailapp.util.EmailFileManager;
 import com.emailapp.util.NetworkUtils;
 import java.io.*;

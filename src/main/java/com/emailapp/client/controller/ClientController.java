@@ -1,6 +1,6 @@
 package com.emailapp.client.controller;
 
-import com.emailapp.client.model.Email;
+import com.emailapp.util.Email;
 import com.emailapp.client.model.EmailUpdateListener;
 import com.emailapp.client.model.MailClient;
 import javafx.animation.KeyFrame;
@@ -17,7 +17,6 @@ import javafx.stage.Modality;
 import javafx.util.Duration;
 import javafx.beans.property.SimpleStringProperty;
 
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;

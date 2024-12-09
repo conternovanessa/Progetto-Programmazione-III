@@ -1,6 +1,6 @@
 package com.emailapp.server.model;
 
-import com.emailapp.client.model.Email;
+import com.emailapp.util.Email;
 import com.emailapp.server.controller.ServerController;
 import com.emailapp.util.EmailFileManager;
 import java.io.IOException;

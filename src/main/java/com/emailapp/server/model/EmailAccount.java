@@ -1,6 +1,6 @@
 package com.emailapp.server.model;
 
-import com.emailapp.client.model.Email;
+import com.emailapp.util.Email;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import java.util.concurrent.locks.ReadWriteLock;

@@ -1,6 +1,5 @@
 package com.emailapp.util;
 
-import com.emailapp.client.model.Email;
 import java.io.*;
 import java.nio.file.*;
 import java.time.format.DateTimeFormatter;

@@ -1,6 +1,6 @@
 package com.emailapp.server.controller;
 
-import com.emailapp.client.model.Email;
+import com.emailapp.util.Email;
 import com.emailapp.server.model.ClientPorts;
 import com.emailapp.server.model.MailServer;
 import com.emailapp.util.EmailFileManager;

@@ -1,7 +1,5 @@
 package com.emailapp.util;
 
-import com.emailapp.client.model.Email;
-
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
