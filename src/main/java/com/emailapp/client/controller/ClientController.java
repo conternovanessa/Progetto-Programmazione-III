@@ -18,9 +18,7 @@ import javafx.beans.property.SimpleStringProperty;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Optional;
-import java.util.Arrays;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -194,6 +192,11 @@ public class ClientController implements EmailUpdateListener {
 
     @FXML
     private void handleSendEmail() {
+        if (!mailClient.isConnected()) {
+            showErrorAlert("Server non raggiungibile", "Impossibile inviare l'email: server non raggiungibile");
+            return;
+        }
+
         try {
             String[] recipients = toField.getText().split("\\s*,\\s*");
             String response = mailClient.handleEmailSend(recipients, subjectField.getText(), bodyArea.getText());
@@ -211,6 +214,8 @@ public class ClientController implements EmailUpdateListener {
     }
 
 
+
+
     @FXML
     private void handleReplyEmail() {
         if (currentDisplayedEmail == null) {
@@ -218,13 +223,30 @@ public class ClientController implements EmailUpdateListener {
             return;
         }
 
-        try {
-            Email replyTemplate = mailClient.createActionEmail("REPLY",currentDisplayedEmail.getId());
-            populateComposeFields(replyTemplate);
-            showComposeView();
-        } catch (Exception e) {
-            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
-        }
+        Platform.runLater(() -> {
+            try {
+                if (mailClient.isConnected()) {
+                    Email replyTemplate = mailClient.createActionEmail("REPLY", currentDisplayedEmail.getId());
+                    populateComposeFields(replyTemplate);
+                } else {
+                    // Crea un template locale per la risposta
+                    Email replyTemplate = new Email();
+                    replyTemplate.setRecipients(Arrays.asList(currentDisplayedEmail.getSender()));
+                    replyTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
+                    replyTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
+                    populateComposeFields(replyTemplate);
+                }
+                showComposeView();
+            } catch (Exception e) {
+                // Gestione fallback locale in caso di errore
+                Email replyTemplate = new Email();
+                replyTemplate.setRecipients(Arrays.asList(currentDisplayedEmail.getSender()));
+                replyTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
+                replyTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
+                populateComposeFields(replyTemplate);
+                showComposeView();
+            }
+        });
     }
 
     @FXML
@@ -234,13 +256,38 @@ public class ClientController implements EmailUpdateListener {
             return;
         }
 
-        try {
-            Email replyAllTemplate = mailClient.createActionEmail("REPLY_ALL",currentDisplayedEmail.getId());
-            populateComposeFields(replyAllTemplate);
-            showComposeView();
-        } catch (Exception e) {
-            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
-        }
+        Platform.runLater(() -> {
+            try {
+                if (mailClient.isConnected()) {
+                    Email replyAllTemplate = mailClient.createActionEmail("REPLY_ALL", currentDisplayedEmail.getId());
+                    populateComposeFields(replyAllTemplate);
+                } else {
+                    // Crea un template locale per la risposta a tutti
+                    Set<String> recipients = new HashSet<>(currentDisplayedEmail.getRecipients());
+                    recipients.add(currentDisplayedEmail.getSender());
+                    recipients.remove(mailClient.getMailbox().getEmailAddress());
+
+                    Email replyAllTemplate = new Email();
+                    replyAllTemplate.setRecipients(new ArrayList<>(recipients));
+                    replyAllTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
+                    replyAllTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
+                    populateComposeFields(replyAllTemplate);
+                }
+                showComposeView();
+            } catch (Exception e) {
+                // Gestione fallback locale in caso di errore
+                Set<String> recipients = new HashSet<>(currentDisplayedEmail.getRecipients());
+                recipients.add(currentDisplayedEmail.getSender());
+                recipients.remove(mailClient.getMailbox().getEmailAddress());
+
+                Email replyAllTemplate = new Email();
+                replyAllTemplate.setRecipients(new ArrayList<>(recipients));
+                replyAllTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
+                replyAllTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
+                populateComposeFields(replyAllTemplate);
+                showComposeView();
+            }
+        });
     }
 
     @FXML
@@ -250,13 +297,36 @@ public class ClientController implements EmailUpdateListener {
             return;
         }
 
-        try {
-            Email forwardTemplate = mailClient.createActionEmail("FORWARD", currentDisplayedEmail.getId());
-            populateComposeFields(forwardTemplate);
-            showComposeView();
-        } catch (Exception e) {
-            showErrorAlert("Errore di Connessione", "Impossibile connettersi al server");
-        }
+        Platform.runLater(() -> {
+            try {
+                if (mailClient.isConnected()) {
+                    Email forwardTemplate = mailClient.createActionEmail("FORWARD", currentDisplayedEmail.getId());
+                    populateComposeFields(forwardTemplate);
+                } else {
+                    // Crea un template locale per l'inoltro
+                    Email forwardTemplate = new Email();
+                    forwardTemplate.setSubject("Fwd: " + currentDisplayedEmail.getSubject());
+                    forwardTemplate.setBody("\n\n----- Messaggio Inoltrato -----\n" +
+                            "Da: " + currentDisplayedEmail.getSender() + "\n" +
+                            "A: " + String.join(", ", currentDisplayedEmail.getRecipients()) + "\n" +
+                            "Oggetto: " + currentDisplayedEmail.getSubject() + "\n\n" +
+                            currentDisplayedEmail.getBody());
+                    populateComposeFields(forwardTemplate);
+                }
+                showComposeView();
+            } catch (Exception e) {
+                // Gestione fallback locale in caso di errore
+                Email forwardTemplate = new Email();
+                forwardTemplate.setSubject("Fwd: " + currentDisplayedEmail.getSubject());
+                forwardTemplate.setBody("\n\n----- Messaggio Inoltrato -----\n" +
+                        "Da: " + currentDisplayedEmail.getSender() + "\n" +
+                        "A: " + String.join(", ", currentDisplayedEmail.getRecipients()) + "\n" +
+                        "Oggetto: " + currentDisplayedEmail.getSubject() + "\n\n" +
+                        currentDisplayedEmail.getBody());
+                populateComposeFields(forwardTemplate);
+                showComposeView();
+            }
+        });
     }
 
     @FXML
@@ -269,6 +339,11 @@ public class ClientController implements EmailUpdateListener {
 
             Optional<ButtonType> result = confirmDelete.showAndWait();
             if (result.isPresent() && result.get() == ButtonType.OK) {
+                if (!mailClient.isConnected()) {
+                    showErrorAlert("Server non raggiungibile", "Impossibile eliminare l'email: server non raggiungibile");
+                    return;
+                }
+
                 try {
                     mailClient.deleteEmail(String.valueOf(currentDisplayedEmail.getId()));
                     mailClient.getMailbox().removeEmail(currentDisplayedEmail);
@@ -280,6 +355,7 @@ public class ClientController implements EmailUpdateListener {
             }
         }
     }
+
 
     private void startEmailFetcher() {
         executorService.submit(() -> {
