@@ -1,5 +1,6 @@
 package com.emailapp.server.controller;
 
+import com.emailapp.server.model.ServerObserver;
 import com.emailapp.util.Email;
 import com.emailapp.server.model.ClientPorts;
 import com.emailapp.server.model.MailServer;
@@ -22,7 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-public class ServerController {
+public class ServerController implements ServerObserver {
     private final MailServer mailServer;
     private ExecutorService executorService;
     private ServerSocket serverSocket;
@@ -38,6 +39,7 @@ public class ServerController {
 
     public ServerController() {
         this.mailServer = new MailServer(this);
+        this.mailServer.addObserver(this);
         this.executorService = Executors.newCachedThreadPool();
     }
 
@@ -426,5 +428,36 @@ public class ServerController {
 
     public boolean isRunning() {
         return isRunning;
+    }
+
+    @Override
+    public void onEmailSent(Email email) {
+        Platform.runLater(() ->
+                logEvent("📤 Email inviata da: " + email.getSender() +
+                        " a: " + String.join(", ", email.getRecipients()))
+        );
+    }
+
+    @Override
+    public void onEmailReceived(Email email) {
+        Platform.runLater(() ->
+                logEvent("📥 Email ricevuta da: " + email.getSender() +
+                        " per: " + String.join(", ", email.getRecipients()))
+        );
+    }
+
+    @Override
+    public void onEmailDeleted(int emailId) {
+        Platform.runLater(() ->
+                logEvent("🗑️ Email " + emailId + " eliminata")
+        );
+    }
+
+    @Override
+    public void onServerStateChanged(boolean isRunning) {
+        Platform.runLater(() -> {
+            logEvent(isRunning ? "✅ Server avviato" : "⏹️ Server arrestato");
+            updateButtonState();
+        });
     }
 }

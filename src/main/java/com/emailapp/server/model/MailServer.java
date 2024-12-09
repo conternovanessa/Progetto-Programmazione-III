@@ -17,6 +17,7 @@ public class MailServer {
     private final ServerController serverController;
     private final ReadWriteLock serverLock = new ReentrantReadWriteLock();
     private final Map<String, Queue<Email>> messageQueues;
+    private List<ServerObserver> observers = new ArrayList<>();
 
     public MailServer(ServerController serverController) {
         this.accounts = new ConcurrentHashMap<>();
@@ -119,7 +120,7 @@ public class MailServer {
     public void sendEmail(Email email) throws IOException {
         serverLock.writeLock().lock();
         try {
-            // Step 1: Validate sender and recipients
+            // 1. Validation
             validateEmail(email.getSender());
             for (String recipient : email.getRecipients()) {
                 validateEmail(recipient);
@@ -128,11 +129,11 @@ public class MailServer {
             String sender = email.getSender();
             List<String> recipients = email.getRecipients();
 
-            // Step 2: Create accounts if needed
+            // 2. Account creation
             createAccount(sender);
             recipients.forEach(this::createAccount);
 
-            // Step 3: Process sender's copy
+            // 3. Process sender's copy
             int sentEmailId = EmailFileManager.getNextId();
             Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
             senderCopy.setId(sentEmailId);
@@ -140,12 +141,13 @@ public class MailServer {
             try {
                 EmailFileManager.saveEmail(senderCopy, sender);
                 accounts.get(sender).addToSent(senderCopy);
+                notifyEmailSent(senderCopy); // Notify observers
             } catch (IOException e) {
-                serverController.logEvent("❌ Errore salvataggio email per mittente " + sender + ": " + e.getMessage());
+                serverController.logEvent("❌ Errore salvataggio email per mittente " + sender);
                 throw e;
             }
 
-            // Step 4: Process recipients' copies
+            // 4. Process recipients' copies
             for (String recipient : recipients) {
                 int recipientEmailId = EmailFileManager.getNextId();
                 Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
@@ -155,9 +157,9 @@ public class MailServer {
                     EmailFileManager.saveEmail(recipientCopy, recipient);
                     accounts.get(recipient).addToInbox(recipientCopy);
                     queueEmail(recipientCopy, recipient);
-                    serverController.logEvent("📬 Email consegnata a: " + recipient);
+                    notifyEmailReceived(recipientCopy); // Notify observers
                 } catch (IOException e) {
-                    serverController.logEvent("❌ Errore salvataggio email per destinatario " + recipient + ": " + e.getMessage());
+                    serverController.logEvent("❌ Errore salvataggio email per destinatario " + recipient);
                     throw e;
                 }
             }
@@ -165,8 +167,6 @@ public class MailServer {
             serverLock.writeLock().unlock();
         }
     }
-
-
 
     private void queueEmail(Email email, String recipient) {
         messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
@@ -311,25 +311,33 @@ public class MailServer {
     public boolean deleteEmail(int emailId, String requestingUser) {
         serverLock.writeLock().lock();
         try {
+            // 1. Get user account
             EmailAccount account = accounts.get(requestingUser);
             if (account == null) {
-                serverController.logEvent("⚠️ Tentativo di eliminazione fallito: account non trovato per " + requestingUser);
+                serverController.logEvent("⚠️ Account non trovato: " + requestingUser);
                 return false;
             }
 
+            // 2. Try to delete from both inbox and sent
             boolean deletedFromInbox = account.removeFromInbox(emailId);
             boolean deletedFromSent = account.removeFromSent(emailId);
 
+            // 3. If deleted from either location
             if (deletedFromInbox || deletedFromSent) {
                 try {
+                    // Delete from file system
                     EmailFileManager.deleteEmail(emailId, requestingUser);
+                    // Notify observers
+                    notifyEmailDeleted(emailId);
                     return true;
                 } catch (IOException e) {
+                    serverController.logEvent("❌ Errore eliminazione file email: " + e.getMessage());
                     e.printStackTrace();
                     return false;
                 }
             }
-            serverController.logEvent("⚠️ Email " + emailId + " non trovata per l'utente " + requestingUser);
+
+            serverController.logEvent("⚠️ Email " + emailId + " non trovata per " + requestingUser);
             return false;
         } finally {
             serverLock.writeLock().unlock();
@@ -368,6 +376,32 @@ public class MailServer {
             return null;
         } finally {
             serverLock.readLock().unlock();
+        }
+    }
+
+    public void addObserver(ServerObserver observer) {
+        observers.add(observer);
+    }
+
+    public void removeObserver(ServerObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void notifyEmailSent(Email email) {
+        for (ServerObserver observer : observers) {
+            observer.onEmailSent(email);
+        }
+    }
+
+    private void notifyEmailReceived(Email email) {
+        for (ServerObserver observer : observers) {
+            observer.onEmailReceived(email);
+        }
+    }
+
+    private void notifyEmailDeleted(int emailId) {
+        for (ServerObserver observer : observers) {
+            observer.onEmailDeleted(emailId);
         }
     }
 }
