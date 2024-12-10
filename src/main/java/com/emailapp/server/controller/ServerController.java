@@ -149,6 +149,7 @@ public class ServerController implements ServerObserver {
                     break;
 
                 case "FETCH_EMAILS":
+                    // Deprecated but maintained for backward compatibility
                     handleFetchEmails(clientSocket);
                     break;
 
@@ -169,6 +170,7 @@ public class ServerController implements ServerObserver {
             closeClientSocket(clientSocket);
         }
     }
+
 
     private boolean requiresRequestingUser(String command) {
         return command.equals("REPLY") ||
@@ -294,38 +296,39 @@ public class ServerController implements ServerObserver {
                 "❌ Eliminazione email " + emailId + " fallita per: " + requestingUser);
     }
 
-    private void handleFetchReceivedEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
-        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
-        List<Email> receivedEmails = mailServer.getEmailsForRecipient(recipient);
-        NetworkUtils.sendObject(clientSocket, receivedEmails);
-
-        if (!initialFetchDone.contains(recipient)) {
-            logEvent("📥 Caricate " + receivedEmails.size() + " email ricevute per: " + recipient);
-            initialFetchDone.add(recipient);
-        }
-    }
-
     private void handleFetchSentEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String sender = (String) NetworkUtils.receiveObject(clientSocket);
-        List<Email> sentEmails = mailServer.getEmailsFromSender(sender);
-        NetworkUtils.sendObject(clientSocket, sentEmails);
-
         if (!initialFetchDone.contains(sender)) {
-            logEvent("📤 Caricate " + sentEmails.size() + " email inviate da: " + sender);
+            List<Email> sentEmails = mailServer.getEmailsFromSender(sender);
+            initialFetchDone.add(sender);
         }
+        NetworkUtils.sendObject(clientSocket, mailServer.getEmailsFromSender(sender));
+    }
+
+    private void handleFetchReceivedEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
+        String recipient = (String) NetworkUtils.receiveObject(clientSocket);
+        if (!initialFetchDone.contains(recipient)) {
+            List<Email> receivedEmails = mailServer.getEmailsForRecipient(recipient);
+            logEvent("Caricate " + receivedEmails.size() + " email ricevute per: " + recipient);
+            initialFetchDone.add(recipient);
+        }
+        NetworkUtils.sendObject(clientSocket, mailServer.getEmailsForRecipient(recipient));
     }
 
     private void handleFetchEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String userEmail = (String) NetworkUtils.receiveObject(clientSocket);
-        List<Email> allEmails = mailServer.getEmailsForUser(userEmail);
 
-        // Debug log
-        logEvent("📨 Tentativo di caricamento email per: " + userEmail);
-        logEvent("📨 Numero di email trovate: " + allEmails.size());
+        if (!initialFetchDone.contains(userEmail)) {
+            List<Email> allEmails = mailServer.getEmailsForUser(userEmail);
+            String emailCount = allEmails.size() == 1 ? "Caricata 1 email" : "Caricate " + allEmails.size() + " email";
+            logEvent(emailCount + " per: " + userEmail);
+            initialFetchDone.add(userEmail);
+        }
 
-        NetworkUtils.sendObject(clientSocket, allEmails);
-        logEvent("📨 Email inviate al client: " + userEmail);
+        NetworkUtils.sendObject(clientSocket, mailServer.getEmailsForUser(userEmail));
     }
+
+
 
     private void handlePing(Socket clientSocket) throws IOException {
         NetworkUtils.sendObject(clientSocket, "PONG");

@@ -46,22 +46,29 @@ public class MailClient {
     }
 
     public void filterEmails(String filter) throws Exception {
-        if (!isConnected()) {
-            throw new Exception("Server non raggiungibile");
-        }
-
-        try {
-            List<Email> emails = fetchEmails(filter);
-            // Notifichiamo i listener del cambio di filtro
-            for (EmailUpdateListener listener : listeners) {
-                listener.onEmailsFiltered(filter, emails);
+        if (isConnected()) {
+            try {
+                List<Email> emails = fetchEmails(filter);
+                for (EmailUpdateListener listener : listeners) {
+                    listener.onEmailsFiltered(filter, emails);
+                }
+            } catch (Exception e) {
+                for (EmailUpdateListener listener : listeners) {
+                    listener.onEmailUpdateError(e);
+                }
             }
-        } catch (Exception e) {
+        } else {
+            // Offline filtering using local mailbox
+            List<Email> localEmails = filter.equals(SENT_EMAILS) ?
+                    mailbox.getSentEmails() :
+                    mailbox.getReceivedEmails();
+
             for (EmailUpdateListener listener : listeners) {
-                listener.onEmailUpdateError(e);
+                listener.onEmailsFiltered(filter, new ArrayList<>(localEmails));
             }
         }
     }
+
 
     public void pollForNewEmails() {
         try {
@@ -97,9 +104,9 @@ public class MailClient {
     }
 
     public List<Email> fetchEmails(String filter) throws IOException, ClassNotFoundException {
-
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "FETCH_EMAILS");
+            String command = filter.equals(SENT_EMAILS) ? "FETCH_SENT_EMAILS" : "FETCH_RECEIVED_EMAILS";
+            NetworkUtils.sendObject(socket, command);
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
             Object response = NetworkUtils.receiveObject(socket);
@@ -109,6 +116,8 @@ public class MailClient {
             return new ArrayList<>();
         }
     }
+
+
 
 
     public void markEmailAsRead(Email email) throws IOException, ClassNotFoundException {
