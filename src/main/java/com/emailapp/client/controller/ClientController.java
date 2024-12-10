@@ -268,21 +268,20 @@ public class ClientController implements EmailUpdateListener {
             String response = mailClient.handleEmailSend(recipients, subjectField.getText(), bodyArea.getText());
 
             if ("OK".equals(response)) {
-                showEmailListView();
-                showInfoAlert("Email Inviata", "Email inviata con successo");
-                filterEmails(currentFilter);
+                // Non ricaricare l'intera mailbox, aggiorna solo la UI
+                Platform.runLater(() -> {
+                    showEmailListView();
+                    showInfoAlert("Email Inviata", "Email inviata con successo");
+                    emailTableView.refresh();
+                });
             } else {
                 showErrorAlert("Errore", "Impossibile inviare l'email: " + response);
             }
         } catch (Exception e) {
             handleConnectionError();
-            e.printStackTrace(); // Per debug
+            e.printStackTrace();
         }
     }
-
-
-
-
 
     @FXML
     private void handleReplyEmail() {
@@ -452,22 +451,29 @@ public class ClientController implements EmailUpdateListener {
             List<Email> newEmails = mailClient.checkNewEmails();
             if (newEmails != null && !newEmails.isEmpty()) {
                 Platform.runLater(() -> {
-                    // Mantieni lo stato delle email esistenti
+                    ObservableList<Email> currentEmails = mailClient.getMailbox().getReceivedEmails();
+
+                    // Mantieni le email esistenti e aggiungi solo quelle nuove
                     for (Email newEmail : newEmails) {
-                        mailClient.getMailbox().getReceivedEmails().stream()
-                                .filter(existingEmail -> existingEmail.getId() == newEmail.getId())
-                                .findFirst()
-                                .ifPresent(existingEmail -> {
-                                    if (existingEmail.isRead()) {
-                                        newEmail.setRead(true);
-                                    }
-                                });
+                        boolean exists = currentEmails.stream()
+                                .anyMatch(existing -> existing.getId() == newEmail.getId());
+
+                        if (!exists) {
+                            // Preserva lo stato di lettura
+                            currentEmails.stream()
+                                    .filter(existing -> existing.getId() == newEmail.getId())
+                                    .findFirst()
+                                    .ifPresent(existing -> newEmail.setRead(existing.isRead()));
+
+                            currentEmails.add(0, newEmail);
+                        }
                     }
 
-                    if (currentFilter.equals("Email ricevute")) {
-                        mailClient.getMailbox().getReceivedEmails().clear();
-                        newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                        emailTableView.refresh();
+                    // Aggiorna la vista mantenendo la selezione
+                    Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
+                    emailTableView.refresh();
+                    if (selectedEmail != null) {
+                        emailTableView.getSelectionModel().select(selectedEmail);
                     }
                 });
             }
@@ -475,6 +481,7 @@ public class ClientController implements EmailUpdateListener {
             handleConnectionError();
         }
     }
+
 
 
     private void startConnectionChecker() {
@@ -640,27 +647,19 @@ public class ClientController implements EmailUpdateListener {
     public void onNewEmailsReceived(List<Email> newEmails) {
         Platform.runLater(() -> {
             if (currentFilter.equals("Email ricevute")) {
-                // Create a map of existing emails
-                Map<Integer, Email> existingEmails = new HashMap<>();
-                mailClient.getMailbox().getReceivedEmails().forEach(email ->
-                        existingEmails.put(email.getId(), email));
-
-                // Update existing emails or add new ones
-                List<Email> updatedEmails = new ArrayList<>();
+                // Use addNewEmail for each new email
                 for (Email newEmail : newEmails) {
-                    Email existingEmail = existingEmails.get(newEmail.getId());
-                    if (existingEmail != null) {
-                        // Preserve read status from existing email
-                        newEmail.setRead(existingEmail.isRead());
-                        updatedEmails.add(newEmail);
-                    } else {
-                        updatedEmails.add(newEmail);
-                    }
+                    mailClient.getMailbox().addNewEmail(newEmail);
                 }
 
-                // Update the mailbox while preserving read status
-                mailClient.getMailbox().getReceivedEmails().setAll(updatedEmails);
+                // Refresh the TableView
                 emailTableView.refresh();
+
+                // Maintain selection if any
+                Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
+                if (selectedEmail != null) {
+                    emailTableView.getSelectionModel().select(selectedEmail);
+                }
             }
         });
     }
@@ -674,19 +673,39 @@ public class ClientController implements EmailUpdateListener {
     @Override
     public void onEmailsFiltered(String filter, List<Email> emails) {
         Platform.runLater(() -> {
-            mailClient.getMailbox().clearEmails();
             if (emails != null) {
-                if (filter.equals(MailClient.SENT_EMAILS)) {
-                    emails.forEach(mailClient.getMailbox()::addSentEmail);
-                    emailTableView.setItems(mailClient.getMailbox().getSentEmails());
-                } else {
-                    emails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                    emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
+                ObservableList<Email> currentList = filter.equals(MailClient.SENT_EMAILS) ?
+                        mailClient.getMailbox().getSentEmails() :
+                        mailClient.getMailbox().getReceivedEmails();
+
+                // Mantieni le email esistenti
+                List<Email> existingEmails = List.copyOf(currentList);
+
+                // Aggiorna solo le email mancanti
+                for (Email email : emails) {
+                    boolean exists = existingEmails.stream()
+                            .anyMatch(existing -> existing.getId() == email.getId());
+
+                    if (!exists) {
+                        if (filter.equals(MailClient.SENT_EMAILS)) {
+                            mailClient.getMailbox().addSentEmail(email);
+                        } else {
+                            mailClient.getMailbox().addReceivedEmail(email);
+                        }
+                    }
+                }
+
+                // Mantieni la selezione corrente
+                Email selectedEmail = emailTableView.getSelectionModel().getSelectedItem();
+                emailTableView.setItems(currentList);
+                if (selectedEmail != null) {
+                    emailTableView.getSelectionModel().select(selectedEmail);
                 }
                 emailTableView.refresh();
             }
         });
     }
+
 
     @Override
     public void onEmailMarkedAsRead(Email email) {

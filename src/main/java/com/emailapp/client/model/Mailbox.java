@@ -60,14 +60,21 @@ public class Mailbox {
     public synchronized void addNewEmail(Email email) {
         Platform.runLater(() -> {
             synchronized (lock) {
-                if (email.getSender().equals(emailAddress)) {
-                    if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                        sentEmails.add(email);
-                    }
-                } else {
-                    if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                        receivedEmails.add(email);
-                    }
+                ObservableList<Email> targetList = email.getSender().equals(emailAddress) ?
+                        sentEmails : receivedEmails;
+
+                // Verifica se l'email esiste già
+                boolean exists = targetList.stream()
+                        .anyMatch(existing -> existing.getId() == email.getId());
+
+                if (!exists) {
+                    // Preserva lo stato di lettura se l'email esiste
+                    targetList.stream()
+                            .filter(existing -> existing.getId() == email.getId())
+                            .findFirst()
+                            .ifPresent(existing -> email.setRead(existing.isRead()));
+
+                    targetList.add(0, email);
                 }
             }
         });
