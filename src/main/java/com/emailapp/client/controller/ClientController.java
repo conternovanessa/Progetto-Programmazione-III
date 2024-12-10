@@ -222,8 +222,27 @@ public class ClientController implements EmailUpdateListener {
             return;
         }
 
+        // Validazione campi
+        if (toField.getText().trim().isEmpty()) {
+            showErrorAlert("Errore", "Specificare almeno un destinatario");
+            return;
+        }
+
+        if (subjectField.getText().trim().isEmpty()) {
+            showErrorAlert("Errore", "Specificare l'oggetto dell'email");
+            return;
+        }
+
         try {
             String[] recipients = toField.getText().split("\\s*,\\s*");
+            // Validazione formato email destinatari
+            for (String recipient : recipients) {
+                if (!recipient.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                    showErrorAlert("Errore", "Formato email non valido: " + recipient);
+                    return;
+                }
+            }
+
             String response = mailClient.handleEmailSend(recipients, subjectField.getText(), bodyArea.getText());
 
             if ("OK".equals(response)) {
@@ -235,8 +254,10 @@ public class ClientController implements EmailUpdateListener {
             }
         } catch (Exception e) {
             handleConnectionError();
+            e.printStackTrace(); // Per debug
         }
     }
+
 
 
 

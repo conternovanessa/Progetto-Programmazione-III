@@ -10,32 +10,48 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class MailClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 5000;
+    private static final int RETRY_DELAY = 5000;
 
     private final Mailbox mailbox;
     private final ExecutorService executorService;
     private final BooleanProperty connectedProperty;
     private volatile boolean isShuttingDown = false;
-    private List<EmailUpdateListener> listeners = new ArrayList<>();
+    private final List<EmailUpdateListener> listeners = new ArrayList<>();
+    private final ScheduledExecutorService connectionChecker;
     public static final String RECEIVED_EMAILS = "Email ricevute";
     public static final String SENT_EMAILS = "Email inviate";
 
     public MailClient(String emailAddress) {
-        // Rimuovi la porta se presente nell'indirizzo email
+
         if (emailAddress.contains(",")) {
             emailAddress = emailAddress.split(",")[0].trim();
         }
-        this.mailbox = new Mailbox(emailAddress);
+        this.mailbox = new Mailbox(emailAddress.split(",")[0].trim());
         this.executorService = Executors.newCachedThreadPool();
+        this.connectionChecker = Executors.newSingleThreadScheduledExecutor();
         this.connectedProperty = new SimpleBooleanProperty(false);
+        startConnectionChecker();
     }
+
+    private void startConnectionChecker() {
+        connectionChecker.scheduleAtFixedRate(() -> {
+            if (!isShuttingDown) {
+                Platform.runLater(this::checkConnection);
+            }
+        }, 0, 10, TimeUnit.SECONDS);
+    }
+
 
     public void addEmailUpdateListener(EmailUpdateListener listener) {
         listeners.add(listener);
@@ -45,44 +61,56 @@ public class MailClient {
         listeners.remove(listener);
     }
 
-    public void filterEmails(String filter) throws Exception {
-        if (isConnected()) {
+    public void filterEmails(String filter) {
+        executorService.submit(() -> {
             try {
-                List<Email> emails = fetchEmails(filter);
-                for (EmailUpdateListener listener : listeners) {
-                    listener.onEmailsFiltered(filter, emails);
+                List<Email> emails;
+                if (isConnected()) {
+                    emails = fetchEmails(filter);
+                } else {
+                    emails = filter.equals(SENT_EMAILS) ?
+                            mailbox.getSentEmails() :
+                            mailbox.getReceivedEmails();
                 }
-            } catch (Exception e) {
-                for (EmailUpdateListener listener : listeners) {
-                    listener.onEmailUpdateError(e);
-                }
-            }
-        } else {
-            // Offline filtering using local mailbox
-            List<Email> localEmails = filter.equals(SENT_EMAILS) ?
-                    mailbox.getSentEmails() :
-                    mailbox.getReceivedEmails();
 
-            for (EmailUpdateListener listener : listeners) {
-                listener.onEmailsFiltered(filter, new ArrayList<>(localEmails));
+                final List<Email> finalEmails = new ArrayList<>(emails);
+                Platform.runLater(() -> {
+                    for (EmailUpdateListener listener : listeners) {
+                        listener.onEmailsFiltered(filter, finalEmails);
+                    }
+                });
+            } catch (Exception e) {
+                handleError(e);
             }
-        }
+        });
     }
 
 
     public void pollForNewEmails() {
-        try {
-            List<Email> newEmails = checkNewEmails(); // questo metodo già esiste
-            if (newEmails != null && !newEmails.isEmpty()) {
-                for (EmailUpdateListener listener : listeners) {
-                    listener.onNewEmailsReceived(newEmails);
+        if (!isConnected() || isShuttingDown) return;
+
+        executorService.submit(() -> {
+            try {
+                List<Email> newEmails = checkNewEmails();
+                if (newEmails != null && !newEmails.isEmpty()) {
+                    Platform.runLater(() -> {
+                        for (EmailUpdateListener listener : listeners) {
+                            listener.onNewEmailsReceived(newEmails);
+                        }
+                    });
                 }
+            } catch (Exception e) {
+                handleError(e);
             }
-        } catch (Exception e) {
+        });
+    }
+
+    private void handleError(Exception e) {
+        Platform.runLater(() -> {
             for (EmailUpdateListener listener : listeners) {
                 listener.onEmailUpdateError(e);
             }
-        }
+        });
     }
 
     public BooleanProperty connectedProperty() {
@@ -117,9 +145,6 @@ public class MailClient {
         }
     }
 
-
-
-
     public void markEmailAsRead(Email email) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, "MARK_AS_READ");
@@ -134,42 +159,53 @@ public class MailClient {
         }
     }
 
-    public String sendEmail(Email email) throws IOException, ClassNotFoundException {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            // Debug log
-            System.out.println("Attempting to send email from: " + mailbox.getEmailAddress());
+    public String sendEmail(Email email) {
+        try {
+            for (int attempts = 0; attempts < 3; attempts++) {
+                try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                    NetworkUtils.sendObject(socket, "SEND_EMAIL");
+                    NetworkUtils.sendObject(socket, email);
+                    NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
-            NetworkUtils.sendObject(socket, "SEND_EMAIL");
-            NetworkUtils.sendObject(socket, email);
-            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-
-            Object response = NetworkUtils.receiveObject(socket);
-            System.out.println("Server response: " + response);
-
-            return response.toString();
+                    Object response = NetworkUtils.receiveObject(socket);
+                    if (response != null) {
+                        return response.toString();
+                    }
+                } catch (IOException e) {
+                    if (attempts == 2) throw e;
+                    Thread.sleep(RETRY_DELAY);
+                }
+            }
+            return "Errore nell'invio dell'email";
         } catch (Exception e) {
-            System.err.println("Error sending email: " + e.getMessage());
-            e.printStackTrace();
-            throw e;
+            return "Errore: " + e.getMessage();
         }
     }
 
+    public void handleEmailFiltering(String filter) {
+        executorService.submit(() -> {
+            try {
+                if (!isConnected()) {
+                    handleError(new Exception("Server non raggiungibile"));
+                    return;
+                }
 
-    public void handleEmailFiltering(String filter) throws Exception {
-        if (!isConnected()) {
-            throw new Exception("Server non raggiungibile");
-        }
-
-        List<Email> emails = fetchEmails(filter);
-        mailbox.clearEmails();
-        if (emails != null) {
-            if (filter.equals(SENT_EMAILS)) {
-                emails.forEach(mailbox::addSentEmail);
-            } else {
-                emails.forEach(mailbox::addReceivedEmail);
+                List<Email> emails = fetchEmails(filter);
+                if (emails != null) {
+                    Platform.runLater(() -> {
+                        mailbox.clearEmails();
+                        if (filter.equals(SENT_EMAILS)) {
+                            emails.forEach(mailbox::addSentEmail);
+                        } else {
+                            emails.forEach(mailbox::addReceivedEmail);
+                        }
+                        notifyEmailsFiltered(filter, emails);
+                    });
+                }
+            } catch (Exception e) {
+                handleError(e);
             }
-            notifyEmailsFiltered(filter, emails);
-        }
+        });
     }
 
 
@@ -186,18 +222,25 @@ public class MailClient {
         }
     }
 
-
-
-    // Move email sending logic here
     public String handleEmailSend(String[] recipients, String subject, String body) throws Exception {
-        Email newEmail = createEmail(
-                mailbox.getEmailAddress(),
-                Arrays.asList(recipients),
-                subject,
-                body
-        );
-        return sendEmail(newEmail);
+        if (recipients == null || recipients.length == 0) {
+            return "Nessun destinatario specificato";
+        }
+
+        try {
+            Email newEmail = createEmail(
+                    mailbox.getEmailAddress(),
+                    Arrays.asList(recipients),
+                    subject,
+                    body
+            );
+            return sendEmail(newEmail);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new Exception("Errore durante l'invio: " + e.getMessage());
+        }
     }
+
 
     private void notifyEmailsFiltered(String filter, List<Email> emails) {
         for (EmailUpdateListener listener : listeners) {
@@ -274,6 +317,15 @@ public class MailClient {
 
     public void shutdown() {
         isShuttingDown = true;
-        executorService.shutdown();
+        try {
+            connectionChecker.shutdown();
+            executorService.shutdown();
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }
