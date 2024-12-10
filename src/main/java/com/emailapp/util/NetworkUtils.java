@@ -1,5 +1,7 @@
 package com.emailapp.util;
 
+import com.emailapp.util.Email;
+
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
@@ -8,11 +10,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NetworkUtils {
-    private static final int SOCKET_TIMEOUT = 30000; // 30 secondi timeout
+    private static final int SOCKET_TIMEOUT = 30000;
 
     private static ObjectOutputStream createOutputStream(Socket socket) throws IOException {
         socket.setSoTimeout(SOCKET_TIMEOUT);
-        return new ObjectOutputStream(socket.getOutputStream());
+        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+        out.flush(); // Important to flush header
+        return out;
     }
 
     private static ObjectInputStream createInputStream(Socket socket) throws IOException {
@@ -30,7 +34,6 @@ public class NetworkUtils {
             out.writeObject(obj);
             out.flush();
         } finally {
-            // Non chiudiamo l'output stream qui per permettere riutilizzo della socket
             if (out != null) {
                 out.flush();
             }
@@ -42,9 +45,8 @@ public class NetworkUtils {
             throw new SocketException("Socket non valida o chiusa");
         }
 
-        ObjectInputStream in = null;
         try {
-            in = createInputStream(socket);
+            ObjectInputStream in = createInputStream(socket);
             return in.readObject();
         } catch (EOFException e) {
             throw new SocketException("Connessione terminata dal server");
@@ -53,10 +55,27 @@ public class NetworkUtils {
         }
     }
 
-    public static List<Email> fetchEmails(String serverAddress, int serverPort, String emailAddress) throws IOException {
-        Socket socket = null;
+    public static void sendAndReceive(Socket socket, Object request, ResponseHandler handler)
+            throws IOException, ClassNotFoundException {
+        ObjectOutputStream out = null;
+        ObjectInputStream in = null;
         try {
-            socket = new Socket(serverAddress, serverPort);
+            out = createOutputStream(socket);
+            in = createInputStream(socket);
+
+            out.writeObject(request);
+            out.flush();
+
+            handler.handle(in);
+        } finally {
+            closeQuietly(in);
+            closeQuietly(out);
+        }
+    }
+
+    public static List<Email> fetchEmails(String serverAddress, int serverPort, String emailAddress)
+            throws IOException {
+        try (Socket socket = new Socket(serverAddress, serverPort)) {
             socket.setSoTimeout(SOCKET_TIMEOUT);
 
             sendObject(socket, "FETCH_EMAILS");
@@ -70,14 +89,21 @@ public class NetworkUtils {
 
         } catch (ClassNotFoundException e) {
             throw new IOException("Errore nella deserializzazione delle email", e);
-        } finally {
-            if (socket != null && !socket.isClosed()) {
-                try {
-                    socket.close();
-                } catch (IOException e) {
-                    // Log dell'errore
-                }
+        }
+    }
+
+    private static void closeQuietly(Closeable resource) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (IOException e) {
+                // log error
             }
         }
+    }
+
+    @FunctionalInterface
+    public interface ResponseHandler {
+        void handle(ObjectInputStream in) throws IOException, ClassNotFoundException;
     }
 }

@@ -30,35 +30,6 @@ public class Mailbox {
         this.executorService = Executors.newCachedThreadPool();
     }
 
-    public synchronized void loadEmailsFromServer() {
-        if (!emailAddress.isEmpty()) {
-            executorService.submit(() -> {
-                try {
-                    List<Email> allEmails = NetworkUtils.fetchEmails(SERVER_ADDRESS, SERVER_PORT, emailAddress);
-
-                    Platform.runLater(() -> {
-                        synchronized (lock) {
-                            clearAllEmails();
-                            for (Email email : allEmails) {
-                                if (email.getSender().equals(emailAddress)) {
-                                    addSentEmail(email);
-                                } else {
-                                    addReceivedEmail(email);
-                                }
-                            }
-                            if (emailLoadedCallback != null) {
-                                emailLoadedCallback.run();
-                            }
-                        }
-                    });
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-        }
-    }
-
-
 
     public synchronized void loadEmailsFromDisk() {
         executorService.submit(() -> {

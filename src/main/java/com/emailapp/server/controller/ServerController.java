@@ -109,7 +109,15 @@ public class ServerController implements ServerObserver {
                     break;
 
                 case "SEND_EMAIL":
-                    handleSendEmail(clientSocket);
+                    Email newEmail = (Email) NetworkUtils.receiveObject(clientSocket);
+                    String senderEmail = (String) NetworkUtils.receiveObject(clientSocket);
+                    try {
+                        mailServer.sendEmail(newEmail);
+                        NetworkUtils.sendObject(clientSocket, "OK");
+                    } catch (Exception e) {
+                        NetworkUtils.sendObject(clientSocket, "ERROR: " + e.getMessage());
+                        logEvent("❌ Invio fallito da: " + senderEmail);
+                    }
                     break;
 
                 case "REPLY":
@@ -171,7 +179,7 @@ public class ServerController implements ServerObserver {
 
     private void handleWriteSocketRequest(Socket clientSocket) throws IOException, ClassNotFoundException {
         String userEmail = (String) NetworkUtils.receiveObject(clientSocket);
-        logEvent("📝 Ricevuta richiesta apertura socket di scrittura da: " + userEmail);
+        logEvent("📝 Richiesta apertura socket di scrittura da: " + userEmail);
         int dedicatedPort = ClientPorts.getPortForClient(userEmail);
 
         try {
@@ -180,8 +188,6 @@ public class ServerController implements ServerObserver {
             NetworkUtils.sendObject(clientSocket, dedicatedPort);
 
             Socket dedicatedSocket = dedicatedServerSocket.accept();
-            logEvent("✅ Connessione stabilita sulla socket dedicata per: " + userEmail);
-
             Email newEmail = (Email) NetworkUtils.receiveObject(dedicatedSocket);
             String senderEmail = (String) NetworkUtils.receiveObject(dedicatedSocket);
 
@@ -195,14 +201,11 @@ public class ServerController implements ServerObserver {
 
             dedicatedSocket.close();
             dedicatedServerSocket.close();
-            logEvent("🔒 Socket dedicata chiusa dopo l'invio");
         } catch (IOException e) {
+            NetworkUtils.sendObject(clientSocket, -1);
             logEvent("❌ Errore apertura socket dedicata per " + userEmail);
-            NetworkUtils.sendObject(clientSocket, -1); // Segnala errore al client
         }
     }
-
-
 
     private void handleCheckNewEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
@@ -264,6 +267,7 @@ public class ServerController implements ServerObserver {
             closeClientSocket(clientSocket);
         }
     }
+
     private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
         Email newEmail = (Email) NetworkUtils.receiveObject(clientSocket);
         String senderEmail = (String) NetworkUtils.receiveObject(clientSocket);
@@ -277,7 +281,6 @@ public class ServerController implements ServerObserver {
         }
     }
 
-
     private void handleDeleteEmail(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
         Object idObj = NetworkUtils.receiveObject(clientSocket);
         int emailId = Integer.parseInt(idObj.toString());
@@ -290,14 +293,6 @@ public class ServerController implements ServerObserver {
                 "🗑 Email " + emailId + " eliminata da: " + requestingUser :
                 "❌ Eliminazione email " + emailId + " fallita per: " + requestingUser);
     }
-
-
-
-
-
-
-
-
 
     private void handleFetchReceivedEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
@@ -320,12 +315,16 @@ public class ServerController implements ServerObserver {
         }
     }
 
-
     private void handleFetchEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
         String userEmail = (String) NetworkUtils.receiveObject(clientSocket);
         List<Email> allEmails = mailServer.getEmailsForUser(userEmail);
+
+        // Debug log
+        logEvent("📨 Tentativo di caricamento email per: " + userEmail);
+        logEvent("📨 Numero di email trovate: " + allEmails.size());
+
         NetworkUtils.sendObject(clientSocket, allEmails);
-        logEvent("📨 Caricate " + allEmails.size() + " email totali per: " + userEmail);
+        logEvent("📨 Email inviate al client: " + userEmail);
     }
 
     private void handlePing(Socket clientSocket) throws IOException {

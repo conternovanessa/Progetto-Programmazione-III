@@ -97,21 +97,19 @@ public class MailClient {
     }
 
     public List<Email> fetchEmails(String filter) throws IOException, ClassNotFoundException {
+
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            String command = filter.equals("Email inviate") ? "FETCH_SENT_EMAILS" : "FETCH_RECEIVED_EMAILS";
-            NetworkUtils.sendObject(socket, command);
+            NetworkUtils.sendObject(socket, "FETCH_EMAILS");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
             Object response = NetworkUtils.receiveObject(socket);
             if (response instanceof List<?>) {
-                List<?> list = (List<?>) response;
-                if (!list.isEmpty() && list.get(0) instanceof Email) {
-                    return (List<Email>) list;
-                }
+                return (List<Email>) response;
             }
-            return List.of(); // Return empty list if response is not valid
+            return new ArrayList<>();
         }
     }
+
 
     public void markEmailAsRead(Email email) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
@@ -128,27 +126,31 @@ public class MailClient {
     }
 
     public String sendEmail(Email email) throws IOException, ClassNotFoundException {
-        try (Socket controlSocket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(controlSocket, "REQUEST_WRITE_SOCKET");
-            NetworkUtils.sendObject(controlSocket, mailbox.getEmailAddress());
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            // Debug log
+            System.out.println("Attempting to send email from: " + mailbox.getEmailAddress());
 
-            int dedicatedPort = (int) NetworkUtils.receiveObject(controlSocket);
-            if (dedicatedPort == -1) {
-                throw new IOException("Server failed to allocate dedicated port");
-            }
+            NetworkUtils.sendObject(socket, "SEND_EMAIL");
+            NetworkUtils.sendObject(socket, email);
+            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
 
-            try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
-                NetworkUtils.sendObject(dedicatedSocket, email);
-                NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
-                return (String) NetworkUtils.receiveObject(dedicatedSocket);
-            }
+            Object response = NetworkUtils.receiveObject(socket);
+            System.out.println("Server response: " + response);
+
+            return response.toString();
+        } catch (Exception e) {
+            System.err.println("Error sending email: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
     }
+
 
     public void handleEmailFiltering(String filter) throws Exception {
         if (!isConnected()) {
             throw new Exception("Server non raggiungibile");
         }
+
         List<Email> emails = fetchEmails(filter);
         mailbox.clearEmails();
         if (emails != null) {
@@ -160,6 +162,7 @@ public class MailClient {
             notifyEmailsFiltered(filter, emails);
         }
     }
+
 
     public void handleEmailRead(Email email) {
         if (!email.isRead()) {
