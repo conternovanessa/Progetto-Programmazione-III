@@ -3,11 +3,12 @@ package com.emailapp.server.model;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 public class ClientPorts {
-    private static final Map<String, Integer> CLIENT_PORTS = loadPortsFromFile();
+    private static final Map<String, Integer> CLIENT_PORTS = Collections.synchronizedMap(loadPortsFromFile());
 
     private static Map<String, Integer> loadPortsFromFile() {
         Map<String, Integer> ports = new HashMap<>();
@@ -27,19 +28,19 @@ public class ClientPorts {
         return ports;
     }
 
-    public static int getControlPort() {
+    public static synchronized int getControlPort() {
         return 5000;
     }
 
-    public static int getPortForClient(String email) {
+    public static synchronized int getPortForClient(String email) {
         return CLIENT_PORTS.getOrDefault(email, -1);
     }
 
-    public static boolean isValidPort(int port) {
+    public static synchronized boolean isValidPort(int port) {
         return CLIENT_PORTS.containsValue(port);
     }
 
-    public static boolean hasAssignedPort(String email) {
+    public static synchronized boolean hasAssignedPort(String email) {
         return CLIENT_PORTS.containsKey(email);
     }
 }

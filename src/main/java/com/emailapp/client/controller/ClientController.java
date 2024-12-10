@@ -3,6 +3,7 @@ package com.emailapp.client.controller;
 import com.emailapp.util.Email;
 import com.emailapp.client.model.EmailUpdateListener;
 import com.emailapp.client.model.MailClient;
+import com.emailapp.util.EmailFileManager;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -21,6 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class ClientController implements EmailUpdateListener {
     private static final int POLLING_INTERVAL = 1000;
@@ -106,97 +108,117 @@ public class ClientController implements EmailUpdateListener {
     private void setupEmailTableView() {
         TableColumn<Email, String> senderColumn = new TableColumn<>("From");
         senderColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSender()));
-        senderColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    Email email = getTableView().getItems().get(getIndex());
-                    setText(item);
-                    boolean isSentEmail = currentFilter.equals(MailClient.SENT_EMAILS);
-                    email.readProperty().addListener((obs, oldVal, newVal) -> {
-                        setStyle((!newVal && !isSentEmail) ? "-fx-font-weight: bold;" : "-fx-font-weight: normal;");
-                    });
-                    setStyle((!email.isRead() && !isSentEmail) ? "-fx-font-weight: bold;" : "-fx-font-weight: normal;");
-                }
-            }
-        });
+        senderColumn.setCellFactory(tc -> new EmailTableCell());
 
         TableColumn<Email, String> subjectColumn = new TableColumn<>("Subject");
         subjectColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSubject()));
-        subjectColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    Email email = getTableView().getItems().get(getIndex());
-                    setText(item);
-                    boolean isSentEmail = currentFilter.equals(MailClient.SENT_EMAILS);
-                    email.readProperty().addListener((obs, oldVal, newVal) -> {
-                        setStyle((!newVal && !isSentEmail) ? "-fx-font-weight: bold;" : "-fx-font-weight: normal;");
-                    });
-                    setStyle((!email.isRead() && !isSentEmail) ? "-fx-font-weight: bold;" : "-fx-font-weight: normal;");
-                }
-            }
-        });
+        subjectColumn.setCellFactory(tc -> new EmailTableCell());
 
         TableColumn<Email, String> dateColumn = new TableColumn<>("Date");
         dateColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().getSentDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
         ));
-        dateColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    Email email = getTableView().getItems().get(getIndex());
-                    setText(item);
-                    boolean isSentEmail = currentFilter.equals(MailClient.SENT_EMAILS);
-                    email.readProperty().addListener((obs, oldVal, newVal) -> {
-                        setStyle((!newVal && !isSentEmail) ? "-fx-font-weight: bold;" : "-fx-font-weight: normal;");
-                    });
-                    setStyle((!email.isRead() && !isSentEmail) ? "-fx-font-weight: bold;" : "-fx-font-weight: normal;");
-                }
-            }
-        });
+        dateColumn.setCellFactory(tc -> new EmailTableCell());
 
         emailTableView.getColumns().setAll(senderColumn, subjectColumn, dateColumn);
+
+        // Add back the selection handler
         emailTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             if (newSelection != null) {
                 handleEmailSelection(newSelection);
             }
         });
+
+        emailTableView.setRowFactory(tv -> new TableRow<Email>() {
+            @Override
+            protected void updateItem(Email email, boolean empty) {
+                super.updateItem(email, empty);
+                if (email != null) {
+                    setStyle(email.isRead() || currentFilter.equals(MailClient.SENT_EMAILS) ?
+                            "-fx-font-weight: normal;" :
+                            "-fx-font-weight: bold;");
+                } else {
+                    setStyle("");
+                }
+            }
+        });
+    }
+
+    private class EmailTableCell extends TableCell<Email, String> {
+        @Override
+        protected void updateItem(String item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+                setStyle("");
+            } else {
+                setText(item);
+                Email email = getTableView().getItems().get(getIndex());
+
+                // Usa direttamente isRead() che gestisce la proprietà JavaFX
+                boolean isReadEmail = email.isRead();
+                setStyle(!isReadEmail && currentFilter.equals(MailClient.RECEIVED_EMAILS) ?
+                        "-fx-font-weight: bold;" :
+                        "-fx-font-weight: normal;");
+            }
+        }
     }
 
 
+    private <T> TableCell<Email, T> createStyledTableCell() {
+        return new TableCell<>() {
+            @Override
+            protected void updateItem(T item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                    return;
+                }
+
+                Email email = getTableView().getItems().get(getIndex());
+                setText(item.toString());
+
+                // Only show bold if email is unread (isRead = false) and it's in received emails
+                if (!email.isRead() && currentFilter.equals(MailClient.RECEIVED_EMAILS)) {
+                    setStyle("-fx-font-weight: bold;");
+                } else {
+                    setStyle("-fx-font-weight: normal;");
+                }
+            }
+        };
+    }
+
     private void handleEmailSelection(Email email) {
+        if (email == null) return;
+
         try {
             if (!email.isRead()) {
                 mailClient.handleEmailRead(email);
+                email.setRead(true);
+
                 Platform.runLater(() -> {
+                    // Aggiorna lo stato nel mailbox
+                    mailClient.getMailbox().getReceivedEmails().stream()
+                            .filter(e -> e.getId() == email.getId())
+                            .forEach(e -> e.setRead(true));
+
+                    // Forza il refresh della TableView
                     emailTableView.refresh();
-                    // Force a complete refresh of the list
-                    if (currentFilter.equals(MailClient.RECEIVED_EMAILS)) {
-                        ObservableList<Email> currentList = mailClient.getMailbox().getReceivedEmails();
-                        emailTableView.setItems(null);
-                        emailTableView.setItems(currentList);
-                    }
                 });
             }
+
             displayEmailDetails(email);
+
         } catch (Exception e) {
             showErrorAlert("Errore", "Impossibile aprire l'email");
         }
     }
+
+
+
+
 
 
     private void filterEmails(String filter) {
@@ -430,20 +452,22 @@ public class ClientController implements EmailUpdateListener {
             List<Email> newEmails = mailClient.checkNewEmails();
             if (newEmails != null && !newEmails.isEmpty()) {
                 Platform.runLater(() -> {
-                    boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
-                    boolean wasComposeViewVisible = composeView.isVisible();
-                    Email selectedEmail = currentDisplayedEmail;
-
-                    if (currentFilter.equals("Email ricevute")) {
-                        newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                        emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
-                        emailTableView.refresh();
+                    // Mantieni lo stato delle email esistenti
+                    for (Email newEmail : newEmails) {
+                        mailClient.getMailbox().getReceivedEmails().stream()
+                                .filter(existingEmail -> existingEmail.getId() == newEmail.getId())
+                                .findFirst()
+                                .ifPresent(existingEmail -> {
+                                    if (existingEmail.isRead()) {
+                                        newEmail.setRead(true);
+                                    }
+                                });
                     }
 
-                    if (wasDetailViewVisible && selectedEmail != null) {
-                        displayEmailDetails(selectedEmail);
-                    } else if (wasComposeViewVisible) {
-                        showComposeView();
+                    if (currentFilter.equals("Email ricevute")) {
+                        mailClient.getMailbox().getReceivedEmails().clear();
+                        newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
+                        emailTableView.refresh();
                     }
                 });
             }
@@ -451,6 +475,7 @@ public class ClientController implements EmailUpdateListener {
             handleConnectionError();
         }
     }
+
 
     private void startConnectionChecker() {
         executorService.submit(() -> {
@@ -498,8 +523,26 @@ public class ClientController implements EmailUpdateListener {
             actionButtons.setVisible(false);
             composeView.setVisible(false);
 
+            if (currentDisplayedEmail != null) {
+                // Aggiorna lo stato in tutti i posti necessari
+                currentDisplayedEmail.setRead(true);
+
+                // Aggiorna nella lista delle email ricevute
+                mailClient.getMailbox().getReceivedEmails().stream()
+                        .filter(e -> e.getId() == currentDisplayedEmail.getId())
+                        .forEach(e -> e.setRead(true));
+
+                // Aggiorna nella TableView corrente
+                emailTableView.getItems().stream()
+                        .filter(e -> e.getId() == currentDisplayedEmail.getId())
+                        .forEach(e -> e.setRead(true));
+
+                // Forza il refresh della TableView
+                emailTableView.refresh();
+            }
+
             emailTableView.getSelectionModel().clearSelection();
-            refreshEmailList();
+            currentDisplayedEmail = null;
         });
     }
 
@@ -596,23 +639,32 @@ public class ClientController implements EmailUpdateListener {
     @Override
     public void onNewEmailsReceived(List<Email> newEmails) {
         Platform.runLater(() -> {
-            boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
-            boolean wasComposeViewVisible = composeView.isVisible();
-            Email selectedEmail = currentDisplayedEmail;
-
             if (currentFilter.equals("Email ricevute")) {
-                newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
-                emailTableView.refresh();
-            }
+                // Create a map of existing emails
+                Map<Integer, Email> existingEmails = new HashMap<>();
+                mailClient.getMailbox().getReceivedEmails().forEach(email ->
+                        existingEmails.put(email.getId(), email));
 
-            if (wasDetailViewVisible && selectedEmail != null) {
-                displayEmailDetails(selectedEmail);
-            } else if (wasComposeViewVisible) {
-                showComposeView();
+                // Update existing emails or add new ones
+                List<Email> updatedEmails = new ArrayList<>();
+                for (Email newEmail : newEmails) {
+                    Email existingEmail = existingEmails.get(newEmail.getId());
+                    if (existingEmail != null) {
+                        // Preserve read status from existing email
+                        newEmail.setRead(existingEmail.isRead());
+                        updatedEmails.add(newEmail);
+                    } else {
+                        updatedEmails.add(newEmail);
+                    }
+                }
+
+                // Update the mailbox while preserving read status
+                mailClient.getMailbox().getReceivedEmails().setAll(updatedEmails);
+                emailTableView.refresh();
             }
         });
     }
+
 
     @Override
     public void onEmailUpdateError(Exception e) {
@@ -639,16 +691,14 @@ public class ClientController implements EmailUpdateListener {
     @Override
     public void onEmailMarkedAsRead(Email email) {
         Platform.runLater(() -> {
+            // Update mailbox and force table refresh
             mailClient.getMailbox().updateEmailReadStatus(email);
-            emailTableView.getItems().clear();
-            emailTableView.setItems(currentFilter.equals(MailClient.RECEIVED_EMAILS) ?
+            ObservableList<Email> currentList = currentFilter.equals(MailClient.RECEIVED_EMAILS) ?
                     mailClient.getMailbox().getReceivedEmails() :
-                    mailClient.getMailbox().getSentEmails());
+                    mailClient.getMailbox().getSentEmails();
+            emailTableView.setItems(null);
+            emailTableView.setItems(currentList);
             emailTableView.refresh();
-
-            if (currentDisplayedEmail != null && currentDisplayedEmail.getId() == email.getId()) {
-                displayEmailDetails(email);
-            }
         });
     }
 

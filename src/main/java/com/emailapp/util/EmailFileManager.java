@@ -187,6 +187,29 @@ public class EmailFileManager {
         Files.write(filePath, lines);
     }
 
+    public static void saveEmailReadStatus(String userEmail, String emailId) throws IOException {
+        Path readStatusFile = Paths.get("data", userEmail, "read_status.txt");
+        Files.createDirectories(readStatusFile.getParent());
+
+        Set<String> readEmails = new HashSet<>();
+        if (Files.exists(readStatusFile)) {
+            readEmails.addAll(Files.readAllLines(readStatusFile));
+        }
+
+        readEmails.add(emailId);
+        Files.write(readStatusFile, readEmails);
+    }
+
+    public static boolean isEmailRead(String userEmail, String emailId) throws IOException {
+        Path readStatusFile = Paths.get("data", userEmail, "read_status.txt");
+        if (!Files.exists(readStatusFile)) {
+            return false;
+        }
+
+        Set<String> readEmails = new HashSet<>(Files.readAllLines(readStatusFile));
+        return readEmails.contains(emailId);
+    }
+
     public static List<String> loadValidEmails() throws IOException {
         List<String> emails = new ArrayList<>();
         try (InputStream inputStream = EmailFileManager.class.getResourceAsStream("/emails.txt");

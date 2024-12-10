@@ -10,7 +10,7 @@ public class EmailAccount {
     private final String emailAddress;
     private final ObservableList<Email> inbox;
     private final ObservableList<Email> sent;
-    private final ReadWriteLock accountLock = new ReentrantReadWriteLock();
+    private final ReadWriteLock accountLock = new ReentrantReadWriteLock(true); // Fair locking
 
     public EmailAccount(String emailAddress) {
         this.emailAddress = emailAddress;

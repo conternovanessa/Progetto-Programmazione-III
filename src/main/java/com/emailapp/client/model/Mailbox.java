@@ -86,24 +86,31 @@ public class Mailbox {
         }
     }
 
-
     public void updateEmailReadStatus(Email email) {
-        for (Email e : receivedEmails) {
-            if (e.getId() == email.getId()) {
-                e.setRead(true);
-                break;
-            }
-        }
+        Platform.runLater(() -> {
+            synchronized (lock) {
+                // Update in received emails list
+                receivedEmails.stream()
+                        .filter(e -> e.getId() == email.getId())
+                        .findFirst()
+                        .ifPresent(e -> {
+                            e.setRead(true);
+                            int index = receivedEmails.indexOf(e);
+                            receivedEmails.set(index, e); // Force update
+                        });
 
-        for (Email e : sentEmails) {
-            if (e.getId() == email.getId()) {
-                e.setRead(true);
-                break;
+                // Update in sent emails list
+                sentEmails.stream()
+                        .filter(e -> e.getId() == email.getId())
+                        .findFirst()
+                        .ifPresent(e -> {
+                            e.setRead(true);
+                            int index = sentEmails.indexOf(e);
+                            sentEmails.set(index, e); // Force update
+                        });
             }
-        }
+        });
     }
-
-
 
     public void setEmailLoadedCallback(Runnable callback) {
         this.emailLoadedCallback = callback;
