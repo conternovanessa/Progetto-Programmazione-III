@@ -1,5 +1,6 @@
 package com.emailapp;
 
+import com.emailapp.server.Server;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -30,16 +31,12 @@ public class StartApp extends Application {
         try {
             clientManager = ClientManager.getInstance();
 
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/server/ServerView.fxml"));
-            Parent root = loader.load();
+            // Avvia il server
+            Server server = new Server();
+            Stage serverStage = new Stage();
+            server.start(serverStage);
 
-            serverController = loader.getController();
-
-            Scene scene = new Scene(root, 600, 400);
-            primaryStage.setScene(scene);
-            primaryStage.setTitle("Email Server");
-            primaryStage.show();
-
+            // Avvia i client
             List<String> emailAddresses = readEmailAddresses();
             for (String email : emailAddresses) {
                 startClient(email);
@@ -47,7 +44,7 @@ public class StartApp extends Application {
 
             createRecentClientsButton();
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             System.err.println("Errore durante l'avvio dell'applicazione: " + e.getMessage());
             Platform.exit();
