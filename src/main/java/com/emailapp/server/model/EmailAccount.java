@@ -1,8 +1,11 @@
 package com.emailapp.server.model;
 
 import com.emailapp.util.Email;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -10,7 +13,8 @@ public class EmailAccount {
     private final String emailAddress;
     private final ObservableList<Email> inbox;
     private final ObservableList<Email> sent;
-    private final ReadWriteLock accountLock = new ReentrantReadWriteLock();
+    private final ReadWriteLock accountLock = new ReentrantReadWriteLock(true); // Fair lock
+    private static final long LOCK_TIMEOUT = 3000; // 3 secondi timeout
 
     public EmailAccount(String emailAddress) {
         this.emailAddress = emailAddress;
@@ -19,82 +23,130 @@ public class EmailAccount {
     }
 
     public ObservableList<Email> getInbox() {
-        accountLock.readLock().lock();
         try {
-            return FXCollections.unmodifiableObservableList(inbox);
-        } finally {
-            accountLock.readLock().unlock();
+            if (!accountLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante l'accesso alla inbox");
+            }
+            try {
+                return FXCollections.unmodifiableObservableList(inbox);
+            } finally {
+                accountLock.readLock().unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Operazione interrotta durante l'accesso alla inbox");
         }
     }
 
     public ObservableList<Email> getSent() {
-        accountLock.readLock().lock();
         try {
-            return FXCollections.unmodifiableObservableList(sent);
-        } finally {
-            accountLock.readLock().unlock();
+            if (!accountLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante l'accesso alle email inviate");
+            }
+            try {
+                return FXCollections.unmodifiableObservableList(sent);
+            } finally {
+                accountLock.readLock().unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Operazione interrotta durante l'accesso alle email inviate");
         }
     }
 
     public void addToInbox(Email email) {
-        accountLock.writeLock().lock();
         try {
-            if (inbox.stream().noneMatch(e -> e.getId() == email.getId())) {
-                inbox.add(email);
+            if (!accountLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante l'aggiunta alla inbox");
             }
-        } finally {
-            accountLock.writeLock().unlock();
+            try {
+                if (inbox.stream().noneMatch(e -> e.getId() == email.getId())) {
+                    Platform.runLater(() -> inbox.add(email));
+                }
+            } finally {
+                accountLock.writeLock().unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Operazione interrotta durante l'aggiunta alla inbox");
         }
     }
 
     public void addToSent(Email email) {
-        accountLock.writeLock().lock();
         try {
-            if (sent.stream().noneMatch(e -> e.getId() == email.getId())) {
-                sent.add(email);
+            if (!accountLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante l'aggiunta alle email inviate");
             }
-        } finally {
-            accountLock.writeLock().unlock();
+            try {
+                if (sent.stream().noneMatch(e -> e.getId() == email.getId())) {
+                    Platform.runLater(() -> sent.add(email));
+                }
+            } finally {
+                accountLock.writeLock().unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Operazione interrotta durante l'aggiunta alle email inviate");
         }
     }
 
-
     public boolean removeFromInbox(int emailId) {
-        accountLock.writeLock().lock();
         try {
-            return inbox.removeIf(email -> email.getId() == emailId);
-        } finally {
-            accountLock.writeLock().unlock();
+            if (!accountLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante la rimozione dalla inbox");
+            }
+            try {
+                return inbox.removeIf(email -> email.getId() == emailId);
+            } finally {
+                accountLock.writeLock().unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Operazione interrotta durante la rimozione dalla inbox");
         }
     }
 
     public boolean removeFromSent(int emailId) {
-        accountLock.writeLock().lock();
         try {
-            return sent.removeIf(email -> email.getId() == emailId);
-        } finally {
-            accountLock.writeLock().unlock();
+            if (!accountLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante la rimozione dalle email inviate");
+            }
+            try {
+                return sent.removeIf(email -> email.getId() == emailId);
+            } finally {
+                accountLock.writeLock().unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Operazione interrotta durante la rimozione dalle email inviate");
         }
     }
 
     public Email getEmailById(int emailId) {
-        accountLock.readLock().lock();
         try {
-            Email inboxEmail = inbox.stream()
-                    .filter(e -> e.getId() == emailId)
-                    .findFirst()
-                    .orElse(null);
-
-            if (inboxEmail != null) {
-                return inboxEmail;
+            if (!accountLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante la ricerca email");
             }
+            try {
+                Email inboxEmail = inbox.stream()
+                        .filter(e -> e.getId() == emailId)
+                        .findFirst()
+                        .orElse(null);
 
-            return sent.stream()
-                    .filter(e -> e.getId() == emailId)
-                    .findFirst()
-                    .orElse(null);
-        } finally {
-            accountLock.readLock().unlock();
+                if (inboxEmail != null) {
+                    return inboxEmail;
+                }
+
+                return sent.stream()
+                        .filter(e -> e.getId() == emailId)
+                        .findFirst()
+                        .orElse(null);
+            } finally {
+                accountLock.readLock().unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Operazione interrotta durante la ricerca email");
         }
     }
 
