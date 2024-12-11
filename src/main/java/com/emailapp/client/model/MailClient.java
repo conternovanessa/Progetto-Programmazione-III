@@ -10,10 +10,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 public class MailClient {
     private static final String SERVER_ADDRESS = "localhost";
@@ -27,6 +31,11 @@ public class MailClient {
     public static final String RECEIVED_EMAILS = "Email ricevute";
     public static final String SENT_EMAILS = "Email inviate";
 
+    private final Object listenersLock = new Object();
+    private final Object connectionLock = new Object();
+    private final ReentrantReadWriteLock mailboxLock = new ReentrantReadWriteLock(true);
+    private static final long LOCK_TIMEOUT = 3000; // 3 secondi timeout
+
     public MailClient(String emailAddress) {
         // Rimuovi la porta se presente nell'indirizzo email
         if (emailAddress.contains(",")) {
@@ -38,34 +47,44 @@ public class MailClient {
     }
 
     public void addEmailUpdateListener(EmailUpdateListener listener) {
-        listeners.add(listener);
+        synchronized(listenersLock) {
+            listeners.add(listener);
+        }
     }
 
     public void removeEmailUpdateListener(EmailUpdateListener listener) {
-        listeners.remove(listener);
+        synchronized(listenersLock) {
+            listeners.remove(listener);
+        }
+    }
+
+    private void notifyListeners(Consumer<EmailUpdateListener> action) {
+        synchronized(listenersLock) {
+            for (EmailUpdateListener listener : listeners) {
+                action.accept(listener);
+            }
+        }
     }
 
     public void filterEmails(String filter) throws Exception {
-        if (isConnected()) {
+        try {
+            mailboxLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS);
             try {
-                List<Email> emails = fetchEmails(filter);
-                for (EmailUpdateListener listener : listeners) {
-                    listener.onEmailsFiltered(filter, emails);
+                if (isConnected()) {
+                    List<Email> emails = fetchEmails(filter);
+                    notifyListeners(listener -> listener.onEmailsFiltered(filter, emails));
+                } else {
+                    List<Email> localEmails = filter.equals(SENT_EMAILS) ?
+                            new ArrayList<>(mailbox.getSentEmails()) :
+                            new ArrayList<>(mailbox.getReceivedEmails());
+                    notifyListeners(listener -> listener.onEmailsFiltered(filter, localEmails));
                 }
-            } catch (Exception e) {
-                for (EmailUpdateListener listener : listeners) {
-                    listener.onEmailUpdateError(e);
-                }
+            } finally {
+                mailboxLock.writeLock().unlock();
             }
-        } else {
-            // Offline filtering using local mailbox
-            List<Email> localEmails = filter.equals(SENT_EMAILS) ?
-                    mailbox.getSentEmails() :
-                    mailbox.getReceivedEmails();
-
-            for (EmailUpdateListener listener : listeners) {
-                listener.onEmailsFiltered(filter, new ArrayList<>(localEmails));
-            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new Exception("Timeout durante l'accesso alla mailbox");
         }
     }
 
@@ -94,12 +113,14 @@ public class MailClient {
     }
 
     public void checkConnection() {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "PING");
-            String response = (String) NetworkUtils.receiveObject(socket);
-            connectedProperty.set("PONG".equals(response));
-        } catch (Exception e) {
-            connectedProperty.set(false);
+        synchronized(connectionLock) {
+            try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+                NetworkUtils.sendObject(socket, "PING");
+                String response = (String) NetworkUtils.receiveObject(socket);
+                Platform.runLater(() -> connectedProperty.set("PONG".equals(response)));
+            } catch (Exception e) {
+                Platform.runLater(() -> connectedProperty.set(false));
+            }
         }
     }
 
