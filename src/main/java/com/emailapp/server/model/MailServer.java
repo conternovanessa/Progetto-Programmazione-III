@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -15,15 +16,16 @@ import java.util.stream.Collectors;
 public class MailServer {
     private final Map<String, EmailAccount> accounts;
     private final ServerController serverController;
-    private final ReadWriteLock serverLock = new ReentrantReadWriteLock();
+    private final ReadWriteLock serverLock = new ReentrantReadWriteLock(true); // Fair lock
     private final Map<String, Queue<Email>> messageQueues;
-    private List<ServerObserver> observers = new ArrayList<>();
+    private final List<ServerObserver> observers = Collections.synchronizedList(new ArrayList<>());
+    private final Object OBSERVER_LOCK = new Object();
+    private static final long LOCK_TIMEOUT = 5000; // 5 secondi timeout
 
     public MailServer(ServerController serverController) {
         this.accounts = new ConcurrentHashMap<>();
         this.messageQueues = new ConcurrentHashMap<>();
         this.serverController = serverController;
-        loadExistingEmails();
     }
 
     public void loadExistingEmails() {
@@ -118,53 +120,64 @@ public class MailServer {
     }
 
     public void sendEmail(Email email) throws IOException {
-        serverLock.writeLock().lock();
         try {
-            // 1. Validation
-            validateEmail(email.getSender());
-            for (String recipient : email.getRecipients()) {
-                validateEmail(recipient);
+            if (!serverLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new IOException("Timeout durante l'acquisizione del lock");
             }
-
-            String sender = email.getSender();
-            List<String> recipients = email.getRecipients();
-
-            // 2. Account creation
-            createAccount(sender);
-            recipients.forEach(this::createAccount);
-
-            // 3. Process sender's copy
-            int sentEmailId = EmailFileManager.getNextId();
-            Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
-            senderCopy.setId(sentEmailId);
-
             try {
-                EmailFileManager.saveEmail(senderCopy, sender);
-                accounts.get(sender).addToSent(senderCopy);
-                notifyEmailSent(senderCopy); // Notify observers
-            } catch (IOException e) {
-                serverController.logEvent("❌ Errore salvataggio email per mittente " + sender);
-                throw e;
-            }
+                // 1. Validation
+                validateEmail(email.getSender());
+                for (String recipient : email.getRecipients()) {
+                    validateEmail(recipient);
+                }
 
-            // 4. Process recipients' copies
-            for (String recipient : recipients) {
-                int recipientEmailId = EmailFileManager.getNextId();
-                Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
-                recipientCopy.setId(recipientEmailId);
+                String sender = email.getSender();
+                List<String> recipients = email.getRecipients();
+
+                // 2. Account creation
+                createAccount(sender);
+                recipients.forEach(this::createAccount);
+
+                // 3. Process sender's copy
+                int sentEmailId = EmailFileManager.getNextId();
+                Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
+                senderCopy.setId(sentEmailId);
 
                 try {
-                    EmailFileManager.saveEmail(recipientCopy, recipient);
-                    accounts.get(recipient).addToInbox(recipientCopy);
-                    queueEmail(recipientCopy, recipient);
-                    notifyEmailReceived(recipientCopy); // Notify observers
+                    EmailFileManager.saveEmail(senderCopy, sender);
+                    accounts.get(sender).addToSent(senderCopy);
+                    synchronized(OBSERVER_LOCK) {
+                        notifyEmailSent(senderCopy);
+                    }
                 } catch (IOException e) {
-                    serverController.logEvent("❌ Errore salvataggio email per destinatario " + recipient);
+                    serverController.logEvent("❌ Errore salvataggio email per mittente " + sender);
                     throw e;
                 }
+
+                // 4. Process recipients' copies
+                for (String recipient : recipients) {
+                    int recipientEmailId = EmailFileManager.getNextId();
+                    Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
+                    recipientCopy.setId(recipientEmailId);
+
+                    try {
+                        EmailFileManager.saveEmail(recipientCopy, recipient);
+                        accounts.get(recipient).addToInbox(recipientCopy);
+                        queueEmail(recipientCopy, recipient);
+                        synchronized(OBSERVER_LOCK) {
+                            notifyEmailReceived(recipientCopy);
+                        }
+                    } catch (IOException e) {
+                        serverController.logEvent("❌ Errore salvataggio email per destinatario " + recipient);
+                        throw e;
+                    }
+                }
+            } finally {
+                serverLock.writeLock().unlock();
             }
-        } finally {
-            serverLock.writeLock().unlock();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Operazione interrotta durante l'attesa del lock");
         }
     }
 
@@ -172,6 +185,7 @@ public class MailServer {
         messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
                 .offer(email);
     }
+
 
     public List<Email> getNewEmails(String recipient) {
         serverLock.readLock().lock();
@@ -184,17 +198,21 @@ public class MailServer {
     }
 
     public List<Email> retrieveQueuedEmails(String recipient) {
-        Queue<Email> queue = messageQueues.get(recipient);
-        if (queue == null) {
-            return new ArrayList<>();
+        serverLock.readLock().lock();
+        try {
+            Queue<Email> queue = messageQueues.get(recipient);
+            if (queue == null) {
+                return new ArrayList<>();
+            }
+            List<Email> emails = new ArrayList<>();
+            Email email;
+            while ((email = queue.poll()) != null) {
+                emails.add(email);
+            }
+            return emails;
+        } finally {
+            serverLock.readLock().unlock();
         }
-
-        List<Email> emails = new ArrayList<>();
-        Email email;
-        while ((email = queue.poll()) != null) {
-            emails.add(email);
-        }
-        return emails;
     }
 
     public List<Email> getEmailsForUser(String recipient) {
@@ -380,28 +398,39 @@ public class MailServer {
     }
 
     public void addObserver(ServerObserver observer) {
-        observers.add(observer);
+        synchronized(OBSERVER_LOCK) {
+            observers.add(observer);
+        }
     }
 
     public void removeObserver(ServerObserver observer) {
-        observers.remove(observer);
+        synchronized(OBSERVER_LOCK) {
+            observers.remove(observer);
+        }
     }
 
     private void notifyEmailSent(Email email) {
-        for (ServerObserver observer : observers) {
-            observer.onEmailSent(email);
+        synchronized(OBSERVER_LOCK) {
+            for (ServerObserver observer : observers) {
+                observer.onEmailSent(email);
+            }
         }
     }
 
     private void notifyEmailReceived(Email email) {
-        for (ServerObserver observer : observers) {
-            observer.onEmailReceived(email);
+        synchronized(OBSERVER_LOCK) {
+            for (ServerObserver observer : observers) {
+                observer.onEmailReceived(email);
+            }
         }
     }
 
+
     private void notifyEmailDeleted(int emailId) {
-        for (ServerObserver observer : observers) {
-            observer.onEmailDeleted(emailId);
+        synchronized(OBSERVER_LOCK) {
+            for (ServerObserver observer : observers) {
+                observer.onEmailDeleted(emailId);
+            }
         }
     }
 }
