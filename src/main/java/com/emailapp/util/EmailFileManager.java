@@ -56,10 +56,8 @@ public class EmailFileManager {
     }
 
     private static void saveEmailToDirectory(Email email, String userEmail, String directory) throws IOException {
-
         Path userDir = Paths.get(BASE_DIR, userEmail, directory);
         Files.createDirectories(userDir);
-
         String fileName = "Email_" + email.getId() + ".txt";
         Path filePath = userDir.resolve(fileName);
 
@@ -76,9 +74,12 @@ public class EmailFileManager {
             writer.newLine();
             writer.write("Read: false");
             writer.newLine();
-            writer.write("Body: " + email.getBody());
+            writer.write("Body:");
+            writer.newLine();
+            writer.write(email.getBody());
         }
     }
+
 
     public static List<Email> loadEmails(String userEmail) throws IOException {
         List<Email> emails = new ArrayList<>();
@@ -120,8 +121,15 @@ public class EmailFileManager {
             String subject = reader.readLine().substring(9);
             String dateStr = reader.readLine().substring(6);
             boolean read = Boolean.parseBoolean(reader.readLine().substring(6));
-            String bodyLine = reader.readLine();
-            String body = bodyLine.substring(6);
+            reader.readLine(); // Skip the "Body:" line
+
+            // Read the remaining lines as body
+            StringBuilder bodyBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                bodyBuilder.append(line).append("\n");
+            }
+            String body = bodyBuilder.toString().trim();
 
             Email email = new Email(sender, recipients, subject, body);
             email.setId(id);
@@ -130,6 +138,7 @@ public class EmailFileManager {
             return email;
         }
     }
+
 
     public static boolean deleteEmail(int emailId, String userEmail) throws IOException {
         boolean deleted = false;
