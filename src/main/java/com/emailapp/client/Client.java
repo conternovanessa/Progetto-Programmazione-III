@@ -1,5 +1,6 @@
 package com.emailapp.client;
 
+import com.emailapp.StartApp;
 import com.emailapp.client.controller.ClientController;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -9,10 +10,6 @@ import javafx.stage.Stage;
 
 public class Client extends Application {
     private String emailAddress;
-    private ClientController controller;
-
-    public Client() {
-    }
 
     public void setEmailAddress(String emailAddress) {
         this.emailAddress = emailAddress;
@@ -20,23 +17,17 @@ public class Client extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-        if (ClientManager.getInstance().isClientActive(emailAddress)) {
-            Stage existingStage = ClientManager.getInstance().getStage(emailAddress);
-            existingStage.toFront();
-            return;
-        }
-
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/client/ClientView.fxml"));
         Parent root = loader.load();
-        controller = loader.getController();
+        ClientController controller = loader.getController();
         controller.setEmailAddress(emailAddress);
 
         Scene scene = new Scene(root, 600, 400);
         primaryStage.setScene(scene);
         primaryStage.setTitle("Email Client - " + emailAddress);
 
-        ClientManager.getInstance().registerClient(emailAddress, primaryStage, this);
-        primaryStage.setOnCloseRequest(e -> ClientManager.getInstance().removeClient(emailAddress));
+        StartApp.getInstance().registerClient(emailAddress, primaryStage);
+        primaryStage.setOnCloseRequest(e -> StartApp.getInstance().removeClient(emailAddress));
         primaryStage.show();
     }
 }
