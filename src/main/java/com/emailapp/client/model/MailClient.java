@@ -250,24 +250,6 @@ public class MailClient {
         return forwardTemplate;
     }
 
-
-
-    public Email createActionEmail(String action, int emailId) throws IOException, ClassNotFoundException {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, action); // "REPLY" or "REPLY_ALL" or "FORWARD"
-            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-            NetworkUtils.sendObject(socket, emailId);
-
-            String response = (String) NetworkUtils.receiveObject(socket);
-            if ("OK".equals(response)) {
-                Email template = (Email) NetworkUtils.receiveObject(socket);
-                template.setSender(mailbox.getEmailAddress());
-                return template;
-            }
-            throw new IOException("Failed to create reply email");
-        }
-    }
-
     public Email createEmail(String sender, List<String> recipients, String subject, String body) {
         Email email = new Email();
         email.setSender(sender);

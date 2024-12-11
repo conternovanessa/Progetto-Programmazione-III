@@ -378,15 +378,17 @@ public class ClientController implements EmailUpdateListener {
         Platform.runLater(() -> {
             currentDisplayedEmail = email;
             StringBuilder details = new StringBuilder();
-            details.append("Da: ").append(email.getSender()).append("\n");
-            details.append("A: ").append(String.join(", ", email.getRecipients())).append("\n");
-            details.append("Oggetto: ").append(email.getSubject()).append("\n\n");
+            details.append("From: ").append(email.getSender()).append("\n");
+            details.append("To: ").append(String.join(", ", email.getRecipients())).append("\n");
+            details.append("Subject: ").append(email.getSubject()).append("\n");
+            details.append("Date: ").append(email.getSentDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).append("\n");
+            details.append("\n");  // Empty line before body
             details.append(email.getBody());
 
             emailDetailTextArea.setText(details.toString());
             emailDetailTextArea.setVisible(true);
             emailDetailFlow.setVisible(true);
-            emailTableView.setVisible(false);
+            emailTableView.setVisible(true);
             actionButtons.setVisible(true);
             composeView.setVisible(false);
 
@@ -396,6 +398,7 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
+
 
     @FXML
     private void handleBackButton() {
