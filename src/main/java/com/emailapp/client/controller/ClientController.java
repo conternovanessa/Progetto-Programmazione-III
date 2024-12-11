@@ -181,7 +181,6 @@ public class ClientController implements EmailUpdateListener {
     private void handleEmailSelection(Email email) {
         try {
             if (!email.isRead()) {
-                mailClient.handleEmailRead(email);
                 Platform.runLater(() -> {
                     emailTableView.refresh();
                     // Force a complete refresh of the list
@@ -611,22 +610,6 @@ public class ClientController implements EmailUpdateListener {
                     emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
                 }
                 emailTableView.refresh();
-            }
-        });
-    }
-
-    @Override
-    public void onEmailMarkedAsRead(Email email) {
-        Platform.runLater(() -> {
-            mailClient.getMailbox().updateEmailReadStatus(email);
-            emailTableView.getItems().clear();
-            emailTableView.setItems(currentFilter.equals(MailClient.RECEIVED_EMAILS) ?
-                    mailClient.getMailbox().getReceivedEmails() :
-                    mailClient.getMailbox().getSentEmails());
-            emailTableView.refresh();
-
-            if (currentDisplayedEmail != null && currentDisplayedEmail.getId() == email.getId()) {
-                displayEmailDetails(email);
             }
         });
     }

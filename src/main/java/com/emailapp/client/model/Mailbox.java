@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class Mailbox {
     private static final String SERVER_ADDRESS = "localhost";
@@ -22,6 +24,8 @@ public class Mailbox {
     private ExecutorService executorService;
     private Runnable emailLoadedCallback;
     private final Object lock = new Object();
+    private final ReentrantReadWriteLock mailboxLock = new ReentrantReadWriteLock(true);
+    private static final long LOCK_TIMEOUT = 2000; // 2 secondi timeout
 
     public Mailbox(String emailAddress) {
         this.emailAddress = emailAddress;
@@ -58,19 +62,27 @@ public class Mailbox {
     }
 
     public synchronized void addNewEmail(Email email) {
-        Platform.runLater(() -> {
-            synchronized (lock) {
-                if (email.getSender().equals(emailAddress)) {
-                    if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                        sentEmails.add(email);
-                    }
-                } else {
-                    if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                        receivedEmails.add(email);
-                    }
+        try {
+            if (mailboxLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                try {
+                    Platform.runLater(() -> {
+                        if (email.getSender().equals(emailAddress)) {
+                            if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
+                                sentEmails.add(email);
+                            }
+                        } else {
+                            if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
+                                receivedEmails.add(email);
+                            }
+                        }
+                    });
+                } finally {
+                    mailboxLock.writeLock().unlock();
                 }
             }
-        });
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public void setEmailAddress(String emailAddress) {
@@ -114,7 +126,18 @@ public class Mailbox {
     }
 
     public ObservableList<Email> getReceivedEmails() {
-        return receivedEmails;
+        try {
+            if (mailboxLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                try {
+                    return FXCollections.unmodifiableObservableList(receivedEmails);
+                } finally {
+                    mailboxLock.readLock().unlock();
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return FXCollections.emptyObservableList();
     }
 
     public ObservableList<Email> getSentEmails() {

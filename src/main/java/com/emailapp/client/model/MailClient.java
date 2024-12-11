@@ -198,20 +198,6 @@ public class MailClient {
     }
 
 
-    public void handleEmailRead(Email email) {
-        if (!email.isRead()) {
-            email.setRead(true);
-            try {
-                EmailFileManager.updateEmailReadStatus(email, mailbox.getEmailAddress());
-                mailbox.updateEmailReadStatus(email);
-                notifyEmailMarkedAsRead(email);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-
 
     // Move email sending logic here
     public String handleEmailSend(String[] recipients, String subject, String body) throws Exception {
@@ -227,12 +213,6 @@ public class MailClient {
     private void notifyEmailsFiltered(String filter, List<Email> emails) {
         for (EmailUpdateListener listener : listeners) {
             listener.onEmailsFiltered(filter, emails);
-        }
-    }
-
-    private void notifyEmailMarkedAsRead(Email email) {
-        for (EmailUpdateListener listener : listeners) {
-            listener.onEmailMarkedAsRead(email);
         }
     }
 
