@@ -443,8 +443,8 @@ public class ServerController implements ServerObserver {
     @Override
     public void onEmailReceived(Email email) {
         Platform.runLater(() ->
-                logEvent("📥 Email ricevuta da: " + email.getSender() +
-                        " per: " + String.join(", ", email.getRecipients()))
+                logEvent("📥 Email ricevuta da: " + email.getRecipients() +
+                        " per: " + String.join(", ", email.getSender()))
         );
     }
 

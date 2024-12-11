@@ -27,7 +27,6 @@ public class NetworkUtils {
         if (socket == null || socket.isClosed()) {
             throw new SocketException("Socket non valida o chiusa");
         }
-
         ObjectOutputStream out = null;
         try {
             out = createOutputStream(socket);
@@ -52,43 +51,6 @@ public class NetworkUtils {
             throw new SocketException("Connessione terminata dal server");
         } catch (SocketTimeoutException e) {
             throw new SocketException("Timeout nella lettura dal server");
-        }
-    }
-
-    public static void sendAndReceive(Socket socket, Object request, ResponseHandler handler)
-            throws IOException, ClassNotFoundException {
-        ObjectOutputStream out = null;
-        ObjectInputStream in = null;
-        try {
-            out = createOutputStream(socket);
-            in = createInputStream(socket);
-
-            out.writeObject(request);
-            out.flush();
-
-            handler.handle(in);
-        } finally {
-            closeQuietly(in);
-            closeQuietly(out);
-        }
-    }
-
-    public static List<Email> fetchEmails(String serverAddress, int serverPort, String emailAddress)
-            throws IOException {
-        try (Socket socket = new Socket(serverAddress, serverPort)) {
-            socket.setSoTimeout(SOCKET_TIMEOUT);
-
-            sendObject(socket, "FETCH_EMAILS");
-            sendObject(socket, emailAddress);
-
-            Object response = receiveObject(socket);
-            if (response instanceof List<?>) {
-                return (List<Email>) response;
-            }
-            return new ArrayList<>();
-
-        } catch (ClassNotFoundException e) {
-            throw new IOException("Errore nella deserializzazione delle email", e);
         }
     }
 
