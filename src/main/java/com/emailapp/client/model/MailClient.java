@@ -134,25 +134,29 @@ public class MailClient {
         }
     }
 
-    public String sendEmail(Email email) throws IOException, ClassNotFoundException {
+    private int requestWriteSocket() throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            // Debug log
-            System.out.println("Attempting to send email from: " + mailbox.getEmailAddress());
-
-            NetworkUtils.sendObject(socket, "SEND_EMAIL");
-            NetworkUtils.sendObject(socket, email);
+            NetworkUtils.sendObject(socket, "REQUEST_WRITE_SOCKET");
             NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-
             Object response = NetworkUtils.receiveObject(socket);
-            System.out.println("Server response: " + response);
-
-            return response.toString();
-        } catch (Exception e) {
-            System.err.println("Error sending email: " + e.getMessage());
-            e.printStackTrace();
-            throw e;
+            return (int) response;
         }
     }
+
+    public String sendEmail(Email email) throws IOException, ClassNotFoundException {
+        int dedicatedPort = requestWriteSocket();
+        if (dedicatedPort == -1) {
+            throw new IOException("Failed to get dedicated port from server");
+        }
+
+        try (Socket dedicatedSocket = new Socket(SERVER_ADDRESS, dedicatedPort)) {
+            NetworkUtils.sendObject(dedicatedSocket, email);
+            NetworkUtils.sendObject(dedicatedSocket, mailbox.getEmailAddress());
+            Object response = NetworkUtils.receiveObject(dedicatedSocket);
+            return response.toString();
+        }
+    }
+
 
 
     public void handleEmailFiltering(String filter) throws Exception {
