@@ -6,13 +6,12 @@ import com.emailapp.util.NetworkUtils;
 import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -214,6 +213,41 @@ public class MailClient {
         for (EmailUpdateListener listener : listeners) {
             listener.onEmailsFiltered(filter, emails);
         }
+    }
+
+    // Add these new methods to MailClient class
+    public Email createReplyEmail(Email originalEmail) {
+        Email replyTemplate = new Email();
+        replyTemplate.setRecipients(Arrays.asList(originalEmail.getSender()));
+        replyTemplate.setSubject("Re: " + originalEmail.getSubject());
+        replyTemplate.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
+        replyTemplate.setSender(mailbox.getEmailAddress());
+        return replyTemplate;
+    }
+
+    public Email createReplyAllEmail(Email originalEmail) {
+        Set<String> recipients = new HashSet<>(originalEmail.getRecipients());
+        recipients.add(originalEmail.getSender());
+        recipients.remove(mailbox.getEmailAddress());
+
+        Email replyAllTemplate = new Email();
+        replyAllTemplate.setRecipients(new ArrayList<>(recipients));
+        replyAllTemplate.setSubject("Re: " + originalEmail.getSubject());
+        replyAllTemplate.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
+        replyAllTemplate.setSender(mailbox.getEmailAddress());
+        return replyAllTemplate;
+    }
+
+    public Email createForwardEmail(Email originalEmail) {
+        Email forwardTemplate = new Email();
+        forwardTemplate.setSubject("Fwd: " + originalEmail.getSubject());
+        forwardTemplate.setBody("\n\n----- Messaggio Inoltrato -----\n" +
+                "Da: " + originalEmail.getSender() + "\n" +
+                "A: " + String.join(", ", originalEmail.getRecipients()) + "\n" +
+                "Oggetto: " + originalEmail.getSubject() + "\n\n" +
+                originalEmail.getBody());
+        forwardTemplate.setSender(mailbox.getEmailAddress());
+        return forwardTemplate;
     }
 
 

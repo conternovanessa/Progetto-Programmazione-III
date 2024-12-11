@@ -248,28 +248,9 @@ public class ClientController implements EmailUpdateListener {
         }
 
         Platform.runLater(() -> {
-            try {
-                if (mailClient.isConnected()) {
-                    Email replyTemplate = mailClient.createActionEmail("REPLY", currentDisplayedEmail.getId());
-                    populateComposeFields(replyTemplate);
-                } else {
-                    // Crea un template locale per la risposta
-                    Email replyTemplate = new Email();
-                    replyTemplate.setRecipients(Arrays.asList(currentDisplayedEmail.getSender()));
-                    replyTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
-                    replyTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
-                    populateComposeFields(replyTemplate);
-                }
-                showComposeView();
-            } catch (Exception e) {
-                // Gestione fallback locale in caso di errore
-                Email replyTemplate = new Email();
-                replyTemplate.setRecipients(Arrays.asList(currentDisplayedEmail.getSender()));
-                replyTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
-                replyTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
-                populateComposeFields(replyTemplate);
-                showComposeView();
-            }
+            Email replyTemplate = mailClient.createReplyEmail(currentDisplayedEmail);
+            populateComposeFields(replyTemplate);
+            showComposeView();
         });
     }
 
@@ -281,36 +262,9 @@ public class ClientController implements EmailUpdateListener {
         }
 
         Platform.runLater(() -> {
-            try {
-                if (mailClient.isConnected()) {
-                    Email replyAllTemplate = mailClient.createActionEmail("REPLY_ALL", currentDisplayedEmail.getId());
-                    populateComposeFields(replyAllTemplate);
-                } else {
-                    // Crea un template locale per la risposta a tutti
-                    Set<String> recipients = new HashSet<>(currentDisplayedEmail.getRecipients());
-                    recipients.add(currentDisplayedEmail.getSender());
-                    recipients.remove(mailClient.getMailbox().getEmailAddress());
-
-                    Email replyAllTemplate = new Email();
-                    replyAllTemplate.setRecipients(new ArrayList<>(recipients));
-                    replyAllTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
-                    replyAllTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
-                    populateComposeFields(replyAllTemplate);
-                }
-                showComposeView();
-            } catch (Exception e) {
-                // Gestione fallback locale in caso di errore
-                Set<String> recipients = new HashSet<>(currentDisplayedEmail.getRecipients());
-                recipients.add(currentDisplayedEmail.getSender());
-                recipients.remove(mailClient.getMailbox().getEmailAddress());
-
-                Email replyAllTemplate = new Email();
-                replyAllTemplate.setRecipients(new ArrayList<>(recipients));
-                replyAllTemplate.setSubject("Re: " + currentDisplayedEmail.getSubject());
-                replyAllTemplate.setBody("\n\n----- Messaggio Originale -----\n" + currentDisplayedEmail.getBody());
-                populateComposeFields(replyAllTemplate);
-                showComposeView();
-            }
+            Email replyAllTemplate = mailClient.createReplyAllEmail(currentDisplayedEmail);
+            populateComposeFields(replyAllTemplate);
+            showComposeView();
         });
     }
 
@@ -322,36 +276,12 @@ public class ClientController implements EmailUpdateListener {
         }
 
         Platform.runLater(() -> {
-            try {
-                if (mailClient.isConnected()) {
-                    Email forwardTemplate = mailClient.createActionEmail("FORWARD", currentDisplayedEmail.getId());
-                    populateComposeFields(forwardTemplate);
-                } else {
-                    // Crea un template locale per l'inoltro
-                    Email forwardTemplate = new Email();
-                    forwardTemplate.setSubject("Fwd: " + currentDisplayedEmail.getSubject());
-                    forwardTemplate.setBody("\n\n----- Messaggio Inoltrato -----\n" +
-                            "Da: " + currentDisplayedEmail.getSender() + "\n" +
-                            "A: " + String.join(", ", currentDisplayedEmail.getRecipients()) + "\n" +
-                            "Oggetto: " + currentDisplayedEmail.getSubject() + "\n\n" +
-                            currentDisplayedEmail.getBody());
-                    populateComposeFields(forwardTemplate);
-                }
-                showComposeView();
-            } catch (Exception e) {
-                // Gestione fallback locale in caso di errore
-                Email forwardTemplate = new Email();
-                forwardTemplate.setSubject("Fwd: " + currentDisplayedEmail.getSubject());
-                forwardTemplate.setBody("\n\n----- Messaggio Inoltrato -----\n" +
-                        "Da: " + currentDisplayedEmail.getSender() + "\n" +
-                        "A: " + String.join(", ", currentDisplayedEmail.getRecipients()) + "\n" +
-                        "Oggetto: " + currentDisplayedEmail.getSubject() + "\n\n" +
-                        currentDisplayedEmail.getBody());
-                populateComposeFields(forwardTemplate);
-                showComposeView();
-            }
+            Email forwardTemplate = mailClient.createForwardEmail(currentDisplayedEmail);
+            populateComposeFields(forwardTemplate);
+            showComposeView();
         });
     }
+
 
     @FXML
     private void handleDeleteEmail() {
