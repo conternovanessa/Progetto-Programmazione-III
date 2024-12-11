@@ -2,17 +2,15 @@ package com.emailapp;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
-import javafx.stage.Stage;
 import javafx.scene.control.Button;
 import javafx.scene.layout.VBox;
 import javafx.geometry.Insets;
 import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.scene.Scene;
 import com.emailapp.client.Client;
 import com.emailapp.client.ClientManager;
-import com.emailapp.server.controller.ServerController;
+import com.emailapp.server.Server;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -22,29 +20,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class StartApp extends Application {
-    private ServerController serverController;
+    private Server server;
     private ClientManager clientManager;
 
     @Override
     public void start(Stage primaryStage) {
         try {
+            // Inizializza il gestore dei client
             clientManager = ClientManager.getInstance();
 
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/server/ServerView.fxml"));
-            Parent root = loader.load();
+            // Crea e avvia il server
+            server = new Server();
+            server.start(primaryStage);
 
-            serverController = loader.getController();
-
-            Scene scene = new Scene(root, 600, 400);
-            primaryStage.setScene(scene);
-            primaryStage.setTitle("Email Server");
-            primaryStage.show();
-
+            // Avvia i client dalle email predefinite
             List<String> emailAddresses = readEmailAddresses();
             for (String email : emailAddresses) {
                 startClient(email);
             }
 
+            // Crea il pulsante per i client recenti
             createRecentClientsButton();
 
         } catch (IOException e) {
@@ -107,11 +102,10 @@ public class StartApp extends Application {
         return emails;
     }
 
-
     @Override
     public void stop() {
-        if (serverController != null && serverController.isRunning()) {
-            serverController.handleStopServer();
+        if (server != null) {
+            server.stop();
         }
         Platform.exit();
     }
