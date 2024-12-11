@@ -21,17 +21,21 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 public class ServerController implements ServerObserver {
     private final MailServer mailServer;
-    private ExecutorService executorService;
+    private final ExecutorService executorService;
     private ServerSocket serverSocket;
     private volatile boolean isRunning;
     private static final int DEFAULT_PORT = 5000;
     private static final int SOCKET_TIMEOUT = 30000;
-    private Set<String> initialFetchDone = new HashSet<>();
-
+    private final Set<String> initialFetchDone = Collections.synchronizedSet(new HashSet<>());
+    private final Object socketLock = new Object();
+    private final ReentrantLock serverStateLock = new ReentrantLock(true);
+    private static final long LOCK_TIMEOUT = 3000; // 3 secondi timeout
 
     @FXML private Label portLabel;
     @FXML private Button startStopButton;
@@ -49,17 +53,25 @@ public class ServerController implements ServerObserver {
         startServer(DEFAULT_PORT);
         updateButtonState();
     }
-
     public void startServer(int port) {
-        if (isRunning) return;
-
         try {
-            serverSocket = new ServerSocket(port);
-            isRunning = true;
-            mailServer.loadExistingEmails();
-            executorService.submit(this::acceptConnections);
-            logEvent("✅ Server avviato sulla porta " + port);
-        } catch (IOException e) {
+            if (!serverStateLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante l'avvio del server");
+            }
+            try {
+                if (isRunning) return;
+
+                synchronized(socketLock) {
+                    serverSocket = new ServerSocket(port);
+                    isRunning = true;
+                }
+                mailServer.loadExistingEmails();
+                executorService.submit(this::acceptConnections);
+                logEvent("✅ Server avviato sulla porta " + port);
+            } finally {
+                serverStateLock.unlock();
+            }
+        } catch (Exception e) {
             logEvent("❌ Errore avvio server: " + e.getMessage());
             showErrorAlert("Errore Server", "Impossibile avviare il server", e.getMessage());
         }
@@ -68,7 +80,11 @@ public class ServerController implements ServerObserver {
     private void acceptConnections() {
         while (isRunning) {
             try {
-                Socket clientSocket = serverSocket.accept();
+                Socket clientSocket;
+                synchronized(socketLock) {
+                    if (!isRunning) break;
+                    clientSocket = serverSocket.accept();
+                }
                 executorService.submit(() -> handleClient(clientSocket));
             } catch (IOException e) {
                 if (isRunning) {
@@ -88,79 +104,7 @@ public class ServerController implements ServerObserver {
                 requestingUser = (String) NetworkUtils.receiveObject(clientSocket);
             }
 
-            switch (command) {
-                case "REQUEST_WRITE_SOCKET":
-                    handleWriteSocketRequest(clientSocket);
-                    break;
-
-                case "CHECK_COMPOSE":
-                    NetworkUtils.sendObject(clientSocket, "OK");
-                    break;
-
-                case "MARK_AS_READ":
-                    int emailId = (int) NetworkUtils.receiveObject(clientSocket);
-                    String userEmail = (String) NetworkUtils.receiveObject(clientSocket);
-                    try {
-                        EmailFileManager.markEmailAsRead(emailId, userEmail);
-                        NetworkUtils.sendObject(clientSocket, "OK");
-                    } catch (IOException e) {
-                        NetworkUtils.sendObject(clientSocket, "ERROR");
-                    }
-                    break;
-
-                case "SEND_EMAIL":
-                    Email newEmail = (Email) NetworkUtils.receiveObject(clientSocket);
-                    String senderEmail = (String) NetworkUtils.receiveObject(clientSocket);
-                    try {
-                        mailServer.sendEmail(newEmail);
-                        NetworkUtils.sendObject(clientSocket, "OK");
-                    } catch (Exception e) {
-                        NetworkUtils.sendObject(clientSocket, "ERROR: " + e.getMessage());
-                        logEvent("❌ Invio fallito da: " + senderEmail);
-                    }
-                    break;
-
-                case "REPLY":
-                    handleReply(clientSocket, requestingUser);
-                    break;
-
-                case "REPLY_ALL":
-                    handleReplyAll(clientSocket, requestingUser);
-                    break;
-
-                case "FORWARD":
-                    handleForward(clientSocket, requestingUser);
-                    break;
-
-                case "DELETE_EMAIL":
-                    handleDeleteEmail(clientSocket, requestingUser);
-                    break;
-
-                case "CHECK_NEW_EMAILS":
-                    handleCheckNewEmails(clientSocket);
-                    break;
-
-                case "FETCH_SENT_EMAILS":
-                    handleFetchSentEmails(clientSocket);
-                    break;
-
-                case "FETCH_RECEIVED_EMAILS":
-                    handleFetchReceivedEmails(clientSocket);
-                    break;
-
-                case "FETCH_EMAILS":
-                    // Deprecated but maintained for backward compatibility
-                    handleFetchEmails(clientSocket);
-                    break;
-
-                case "PING":
-                    handlePing(clientSocket);
-                    break;
-
-                default:
-                    logEvent("❓ Comando sconosciuto: " + command);
-                    sendError(clientSocket, "Comando sconosciuto");
-            }
+            processClientCommand(command, requestingUser, clientSocket);
         } catch (Exception e) {
             logEvent("❌ Errore gestione client: " + e.getMessage());
             try {
@@ -168,6 +112,27 @@ public class ServerController implements ServerObserver {
             } catch (IOException ignored) {}
         } finally {
             closeClientSocket(clientSocket);
+        }
+    }
+
+    private void processClientCommand(String command, String requestingUser, Socket clientSocket) throws IOException, ClassNotFoundException {
+        switch (command) {
+            case "REQUEST_WRITE_SOCKET" -> handleWriteSocketRequest(clientSocket);
+            case "CHECK_COMPOSE" -> NetworkUtils.sendObject(clientSocket, "OK");
+            case "SEND_EMAIL" -> handleSendEmail(clientSocket);
+            case "REPLY" -> handleReply(clientSocket, requestingUser);
+            case "REPLY_ALL" -> handleReplyAll(clientSocket, requestingUser);
+            case "FORWARD" -> handleForward(clientSocket, requestingUser);
+            case "DELETE_EMAIL" -> handleDeleteEmail(clientSocket, requestingUser);
+            case "CHECK_NEW_EMAILS" -> handleCheckNewEmails(clientSocket);
+            case "FETCH_SENT_EMAILS" -> handleFetchSentEmails(clientSocket);
+            case "FETCH_RECEIVED_EMAILS" -> handleFetchReceivedEmails(clientSocket);
+            case "FETCH_EMAILS" -> handleFetchEmails(clientSocket);
+            case "PING" -> handlePing(clientSocket);
+            default -> {
+                logEvent("❓ Comando sconosciuto: " + command);
+                sendError(clientSocket, "Comando sconosciuto");
+            }
         }
     }
 
@@ -359,20 +324,27 @@ public class ServerController implements ServerObserver {
     }
 
     public void stopServer() {
-        if (!isRunning) return;
-
-        isRunning = false;
         try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
-                serverSocket.close();
+            if (!serverStateLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout durante l'arresto del server");
             }
-            executorService.shutdownNow();
-            executorService = Executors.newCachedThreadPool();
-            logEvent("✅ Server arrestato");
-        } catch (IOException e) {
+            try {
+                if (!isRunning) return;
+
+                synchronized(socketLock) {
+                    isRunning = false;
+                    if (serverSocket != null && !serverSocket.isClosed()) {
+                        serverSocket.close();
+                    }
+                }
+                executorService.shutdownNow();
+                logEvent("✅ Server arrestato");
+            } finally {
+                serverStateLock.unlock();
+            }
+        } catch (Exception e) {
             logEvent("❌ Errore arresto server: " + e.getMessage());
         }
-        Platform.runLater(() -> startStopButton.setText("Start Server"));
     }
 
     @FXML
