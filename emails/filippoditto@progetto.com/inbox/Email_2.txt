@@ -1,0 +1,7 @@
+Id: 2
+From: fabiodelia@progetto.com
+To: filippoditto@progetto.com
+Subject: sas
+Date: 2024-12-12T16:35:20.730586900
+Read: false
+Body: ses

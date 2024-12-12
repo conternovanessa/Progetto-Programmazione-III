@@ -11,6 +11,7 @@ import java.util.*;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.scene.control.Alert;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,6 +35,7 @@ public class MailClient {
     private final Object connectionLock = new Object();
     private final ReentrantReadWriteLock mailboxLock = new ReentrantReadWriteLock(true);
     private static final long LOCK_TIMEOUT = 3000; // 3 secondi timeout
+    private Socket clientSocket;
 
     public MailClient(String emailAddress) {
         // Rimuovi la porta se presente nell'indirizzo email
@@ -111,12 +113,23 @@ public class MailClient {
         try {
             List<Email> newEmails = checkNewEmails();
             if (newEmails != null && !newEmails.isEmpty()) {
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("Nuova Email");
+                    alert.setHeaderText(null);
+                    String message = newEmails.size() == 1
+                            ? "Hai ricevuto 1 nuova mail"
+                            : "Hai ricevuto " + newEmails.size() + " nuove mail";
+                    alert.setContentText(message);
+                    alert.show();
+                });
                 notifyListeners(listener -> listener.onNewEmailsReceived(newEmails));
             }
         } catch (Exception e) {
             notifyListeners(listener -> listener.onEmailUpdateError(e));
         }
     }
+
 
     public BooleanProperty connectedProperty() {
         return connectedProperty;
@@ -287,13 +300,17 @@ public class MailClient {
 
     public void shutdown() {
         isShuttingDown = true;
-
-        // Clean up network resources
+        if (clientSocket != null && !clientSocket.isClosed()) {
+            try {
+                clientSocket.close();
+                System.out.println("Socket client chiusa correttamente");
+            } catch (IOException e) {
+                System.err.println("Errore chiusura socket: " + e.getMessage());
+            }
+        }
         synchronized(connectionLock) {
             connectedProperty.set(false);
         }
-
-        // Clear mailbox
         mailboxLock.writeLock().lock();
         try {
             mailbox.clearEmails();
