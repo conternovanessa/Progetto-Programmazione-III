@@ -44,13 +44,16 @@ public class StartApp extends Application {
 
     // Gestione Server
     private void startServer() {
-        try {
-            Server server = new Server();
-            Stage serverStage = new Stage();
-            server.start(serverStage);
-        } catch (Exception e) {
-            handleError("Errore Server", "Impossibile avviare il server: " + e.getMessage());
-        }
+        Platform.runLater(() -> {
+            try {
+                Server server = new Server();
+                Stage serverStage = new Stage();
+                server.start(serverStage);
+            } catch (Exception e) {
+                handleError("Errore Server",
+                        "Impossibile avviare il server: " + e.getCause().getMessage());
+            }
+        });
     }
 
     // Gestione Client

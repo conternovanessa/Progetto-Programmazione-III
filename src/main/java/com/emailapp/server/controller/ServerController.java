@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 public class ServerController implements ServerObserver {
     private final MailServer mailServer;
-    private final ExecutorService executorService;
+    private ExecutorService executorService;
     private ServerSocket serverSocket;
     private volatile boolean isRunning;
     private static final int DEFAULT_PORT = 5000;
@@ -53,27 +53,32 @@ public class ServerController implements ServerObserver {
         updateButtonState();
     }
     public void startServer(int port) {
-        try {
-            if (!serverStateLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante l'avvio del server");
-            }
-            try {
-                if (isRunning) return;
+        // First ensure previous server instance is fully stopped
+        stopServer();
 
-                synchronized(socketLock) {
-                    serverSocket = new ServerSocket(port);
-                    isRunning = true;
-                }
-                mailServer.loadExistingEmails();
-                executorService.submit(this::acceptConnections);
-                logEvent("✅ Server avviato sulla porta " + port);
-            } finally {
-                serverStateLock.unlock();
-            }
-        } catch (Exception e) {
-            logEvent("❌ Errore avvio server: " + e.getMessage());
-            showErrorAlert("Errore Server", "Impossibile avviare il server", e.getMessage());
+        // Add small delay to ensure port release
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
+
+        if (executorService == null || executorService.isShutdown()) {
+            executorService = Executors.newCachedThreadPool();
+        }
+
+        executorService.submit(() -> {
+            try {
+                serverSocket = new ServerSocket(port);
+                serverSocket.setReuseAddress(true);  // Enable port reuse
+                isRunning = true;
+                mailServer.loadExistingEmails();
+                logEvent("✅ Server avviato sulla porta " + port);
+                acceptConnections();
+            } catch (IOException e) {
+                logEvent("❌ Errore avvio server: " + e.getMessage());
+            }
+        });
     }
 
     private void acceptConnections() {
@@ -265,26 +270,28 @@ public class ServerController implements ServerObserver {
     }
 
     public void stopServer() {
-        try {
-            if (!serverStateLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante l'arresto del server");
-            }
-            try {
-                if (!isRunning) return;
+        isRunning = false;
 
-                synchronized(socketLock) {
-                    isRunning = false;
-                    if (serverSocket != null && !serverSocket.isClosed()) {
-                        serverSocket.close();
-                    }
-                }
-                executorService.shutdownNow();
-                logEvent("✅ Server arrestato");
-            } finally {
-                serverStateLock.unlock();
+        // Close server socket
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                logEvent("Errore chiusura socket: " + e.getMessage());
             }
-        } catch (Exception e) {
-            logEvent("❌ Errore arresto server: " + e.getMessage());
+        }
+
+        // Shutdown executor
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(2, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -375,4 +382,35 @@ public class ServerController implements ServerObserver {
             updateButtonState();
         });
     }
+
+    public void shutdown() {
+        try {
+            // Stop accepting new connections
+            stopServer();
+
+            // Clear any pending operations
+            if (executorService != null) {
+                executorService.shutdownNow();
+                try {
+                    executorService.awaitTermination(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+
+            // Clear resources
+            if (mailServer != null) {
+                mailServer.removeObserver(this);
+            }
+
+            Platform.runLater(() -> {
+                if (logTextArea != null) {
+                    logTextArea.clear();
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 }
