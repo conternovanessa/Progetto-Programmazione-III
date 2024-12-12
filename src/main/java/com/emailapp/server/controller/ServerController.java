@@ -53,10 +53,9 @@ public class ServerController implements ServerObserver {
         updateButtonState();
     }
     public void startServer(int port) {
-        // First ensure previous server instance is fully stopped
-        stopServer();
+        if (isRunning) return;
 
-        // Add small delay to ensure port release
+        stopServer();
         try {
             Thread.sleep(1000);
         } catch (InterruptedException e) {
@@ -70,16 +69,53 @@ public class ServerController implements ServerObserver {
         executorService.submit(() -> {
             try {
                 serverSocket = new ServerSocket(port);
-                serverSocket.setReuseAddress(true);  // Enable port reuse
+                serverSocket.setReuseAddress(true);
                 isRunning = true;
                 mailServer.loadExistingEmails();
-                logEvent("✅ Server avviato sulla porta " + port);
+                onServerStateChanged(true); // This will handle both logging and button state
                 acceptConnections();
             } catch (IOException e) {
                 logEvent("❌ Errore avvio server: " + e.getMessage());
             }
         });
     }
+
+    public void stopServer() {
+        if (!isRunning) return;
+
+        isRunning = false;
+
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                logEvent("Errore chiusura socket: " + e.getMessage());
+            }
+        }
+
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(2, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        onServerStateChanged(false); // This will handle both logging and button state
+    }
+
+    @Override
+    public void onServerStateChanged(boolean isRunning) {
+        Platform.runLater(() -> {
+            logEvent(isRunning ? "✅ Server avviato" : "⛔ Server arrestato");
+            startStopButton.setText(isRunning ? "Stop Server" : "Start Server");
+        });
+    }
+
 
     private void acceptConnections() {
         while (isRunning) {
@@ -269,32 +305,6 @@ public class ServerController implements ServerObserver {
         updateButtonState();
     }
 
-    public void stopServer() {
-        isRunning = false;
-
-        // Close server socket
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                logEvent("Errore chiusura socket: " + e.getMessage());
-            }
-        }
-
-        // Shutdown executor
-        if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdown();
-            try {
-                if (!executorService.awaitTermination(2, TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                executorService.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
     @FXML
     public void handleStopServer() {
         if (!isRunning) return;
@@ -373,14 +383,6 @@ public class ServerController implements ServerObserver {
         Platform.runLater(() ->
                 logEvent("🗑️ Email " + emailId + " eliminata")
         );
-    }
-
-    @Override
-    public void onServerStateChanged(boolean isRunning) {
-        Platform.runLater(() -> {
-            logEvent(isRunning ? "✅ Server avviato" : "⏹️ Server arrestato");
-            updateButtonState();
-        });
     }
 
     public void shutdown() {
