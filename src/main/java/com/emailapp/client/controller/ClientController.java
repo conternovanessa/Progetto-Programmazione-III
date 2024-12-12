@@ -479,17 +479,25 @@ public class ClientController implements EmailUpdateListener {
     @Override
     public void onEmailsFiltered(String filter, List<Email> emails) {
         Platform.runLater(() -> {
-            mailClient.getMailbox().clearEmails();
             if (emails != null) {
+                // Aggiorna solo le email che sono effettivamente cambiate
                 if (filter.equals(MailClient.SENT_EMAILS)) {
-                    emails.forEach(mailClient.getMailbox()::addSentEmail);
+                    updateEmailList(mailClient.getMailbox().getSentEmails(), emails);
                     emailTableView.setItems(mailClient.getMailbox().getSentEmails());
                 } else {
-                    emails.forEach(mailClient.getMailbox()::addReceivedEmail);
+                    updateEmailList(mailClient.getMailbox().getReceivedEmails(), emails);
                     emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
                 }
                 emailTableView.refresh();
             }
         });
+    }
+    private void updateEmailList(ObservableList<Email> currentList, List<Email> newEmails) {
+        // Aggiungi solo le email che non sono già presenti
+        for (Email newEmail : newEmails) {
+            if (!currentList.stream().anyMatch(e -> e.getId() == newEmail.getId())) {
+                currentList.add(newEmail);
+            }
+        }
     }
 }

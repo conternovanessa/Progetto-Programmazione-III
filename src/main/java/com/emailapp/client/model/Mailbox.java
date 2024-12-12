@@ -114,10 +114,14 @@ public class Mailbox {
         return sentEmails;
     }
     public void addReceivedEmail(Email email) {
-        receivedEmails.add(email);
+        if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
+            receivedEmails.add(email);
+        }
     }
     public void addSentEmail(Email email) {
-        sentEmails.add(email);
+        if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
+            sentEmails.add(email);
+        }
     }
     public void clearEmails() {
         receivedEmails.clear();
