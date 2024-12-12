@@ -57,6 +57,7 @@ public class MailClient {
         }
     }
 
+
     private void notifyListeners(Consumer<EmailUpdateListener> action) {
         synchronized(listenersLock) {
             for (EmailUpdateListener listener : listeners) {
@@ -89,17 +90,15 @@ public class MailClient {
 
 
     public void pollForNewEmails() {
+        if (!isConnected()) return;
+
         try {
-            List<Email> newEmails = checkNewEmails(); // questo metodo già esiste
+            List<Email> newEmails = checkNewEmails();
             if (newEmails != null && !newEmails.isEmpty()) {
-                for (EmailUpdateListener listener : listeners) {
-                    listener.onNewEmailsReceived(newEmails);
-                }
+                notifyListeners(listener -> listener.onNewEmailsReceived(newEmails));
             }
         } catch (Exception e) {
-            for (EmailUpdateListener listener : listeners) {
-                listener.onEmailUpdateError(e);
-            }
+            notifyListeners(listener -> listener.onEmailUpdateError(e));
         }
     }
 
@@ -137,23 +136,6 @@ public class MailClient {
         }
     }
 
-
-
-
-    public void markEmailAsRead(Email email) throws IOException, ClassNotFoundException {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
-            NetworkUtils.sendObject(socket, "MARK_AS_READ");
-            NetworkUtils.sendObject(socket, email.getId());
-            NetworkUtils.sendObject(socket, mailbox.getEmailAddress());
-
-            String response = (String) NetworkUtils.receiveObject(socket);
-            if (!"OK".equals(response)) {
-                throw new IOException("Failed to mark email as read");
-            }
-            email.setRead(true);
-        }
-    }
-
     private int requestWriteSocket() throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
             NetworkUtils.sendObject(socket, "REQUEST_WRITE_SOCKET");
@@ -177,8 +159,6 @@ public class MailClient {
         }
     }
 
-
-
     public void handleEmailFiltering(String filter) throws Exception {
         if (!isConnected()) {
             throw new Exception("Server non raggiungibile");
@@ -196,9 +176,6 @@ public class MailClient {
         }
     }
 
-
-
-    // Move email sending logic here
     public String handleEmailSend(String[] recipients, String subject, String body) throws Exception {
         Email newEmail = createEmail(
                 mailbox.getEmailAddress(),
@@ -215,7 +192,6 @@ public class MailClient {
         }
     }
 
-    // Add these new methods to MailClient class
     public Email createReplyEmail(Email originalEmail) {
         Email replyTemplate = new Email();
         replyTemplate.setRecipients(Arrays.asList(originalEmail.getSender()));
@@ -295,6 +271,34 @@ public class MailClient {
 
     public void shutdown() {
         isShuttingDown = true;
-        executorService.shutdown();
+
+        // Clean up network resources
+        synchronized(connectionLock) {
+            connectedProperty.set(false);
+        }
+
+        // Clear mailbox
+        mailboxLock.writeLock().lock();
+        try {
+            mailbox.clearEmails();
+        } finally {
+            mailboxLock.writeLock().unlock();
+        }
+
+        // Shutdown executor
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdownNow();
+            try {
+                executorService.awaitTermination(500, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // Clear listeners
+        synchronized(listenersLock) {
+            listeners.clear();
+        }
     }
+
 }

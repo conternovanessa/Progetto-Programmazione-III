@@ -21,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class ClientController implements EmailUpdateListener {
     private static final int POLLING_INTERVAL = 1000;
@@ -51,7 +52,6 @@ public class ClientController implements EmailUpdateListener {
         this.mailClient = new MailClient("");
         this.executorService = Executors.newCachedThreadPool();
     }
-
     @FXML
     private void initialize() {
         if (!initialLoadCompleted) {
@@ -65,7 +65,6 @@ public class ClientController implements EmailUpdateListener {
             initialLoadCompleted = true;
         }
     }
-
     public void setEmailAddress(String emailAddress) {
         // Rimuovi la porta se presente nell'indirizzo email
         if (emailAddress.contains(",")) {
@@ -74,8 +73,6 @@ public class ClientController implements EmailUpdateListener {
         mailClient.getMailbox().setEmailAddress(emailAddress);
         emailAddressLabel.setText(emailAddress);
     }
-
-
     private void setupConnectionListener() {
         mailClient.connectedProperty().addListener((observable, oldValue, newValue) -> {
             Platform.runLater(() -> {
@@ -84,7 +81,6 @@ public class ClientController implements EmailUpdateListener {
             });
         });
     }
-
     private void setupEmailFilter() {
         emailFilterComboBox.getItems().addAll(
                 MailClient.RECEIVED_EMAILS,
@@ -102,7 +98,6 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
-
     private void setupEmailTableView() {
         TableColumn<Email, String> senderColumn = new TableColumn<>("From");
         senderColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSender()));
@@ -176,8 +171,6 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
-
-
     private void handleEmailSelection(Email email) {
         try {
             if (!email.isRead()) {
@@ -196,8 +189,6 @@ public class ClientController implements EmailUpdateListener {
             showErrorAlert("Errore", "Impossibile aprire l'email");
         }
     }
-
-
     private void filterEmails(String filter) {
         try {
             mailClient.handleEmailFiltering(filter);
@@ -205,7 +196,6 @@ public class ClientController implements EmailUpdateListener {
             handleConnectionError();
         }
     }
-
     @FXML
     private void handleComposeEmail() {
         Platform.runLater(() -> {
@@ -213,7 +203,6 @@ public class ClientController implements EmailUpdateListener {
             showComposeView();
         });
     }
-
     @FXML
     private void handleSendEmail() {
         if (!mailClient.isConnected()) {
@@ -236,10 +225,6 @@ public class ClientController implements EmailUpdateListener {
             handleConnectionError();
         }
     }
-
-
-
-
     @FXML
     private void handleReplyEmail() {
         if (currentDisplayedEmail == null) {
@@ -253,7 +238,6 @@ public class ClientController implements EmailUpdateListener {
             showComposeView();
         });
     }
-
     @FXML
     private void handleReplyAllEmail() {
         if (currentDisplayedEmail == null) {
@@ -267,7 +251,6 @@ public class ClientController implements EmailUpdateListener {
             showComposeView();
         });
     }
-
     @FXML
     private void handleForwardEmail() {
         if (currentDisplayedEmail == null) {
@@ -281,8 +264,6 @@ public class ClientController implements EmailUpdateListener {
             showComposeView();
         });
     }
-
-
     @FXML
     private void handleDeleteEmail() {
         if (currentDisplayedEmail != null) {
@@ -309,8 +290,6 @@ public class ClientController implements EmailUpdateListener {
             }
         }
     }
-
-
     private void startEmailFetcher() {
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
@@ -326,40 +305,15 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
-
     private void startPolling() {
-        Timeline timeline = new Timeline(new KeyFrame(Duration.millis(POLLING_INTERVAL), e -> pollForNewEmails()));
+        Timeline timeline = new Timeline(new KeyFrame(Duration.millis(POLLING_INTERVAL), e -> {
+            if (mailClient.isConnected()) {
+                mailClient.pollForNewEmails();
+            }
+        }));
         timeline.setCycleCount(Timeline.INDEFINITE);
         timeline.play();
     }
-
-    private void pollForNewEmails() {
-        try {
-            List<Email> newEmails = mailClient.checkNewEmails();
-            if (newEmails != null && !newEmails.isEmpty()) {
-                Platform.runLater(() -> {
-                    boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
-                    boolean wasComposeViewVisible = composeView.isVisible();
-                    Email selectedEmail = currentDisplayedEmail;
-
-                    if (currentFilter.equals("Email ricevute")) {
-                        newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                        emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
-                        emailTableView.refresh();
-                    }
-
-                    if (wasDetailViewVisible && selectedEmail != null) {
-                        displayEmailDetails(selectedEmail);
-                    } else if (wasComposeViewVisible) {
-                        showComposeView();
-                    }
-                });
-            }
-        } catch (Exception e) {
-            handleConnectionError();
-        }
-    }
-
     private void startConnectionChecker() {
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
@@ -373,7 +327,6 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
-
     private void displayEmailDetails(Email email) {
         Platform.runLater(() -> {
             currentDisplayedEmail = email;
@@ -398,8 +351,6 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
-
-
     @FXML
     private void handleBackButton() {
         Platform.runLater(() -> {
@@ -413,7 +364,6 @@ public class ClientController implements EmailUpdateListener {
             refreshEmailList();
         });
     }
-
     private void showComposeView() {
         isComposeViewVisible = true;
         composeView.setVisible(true);
@@ -425,7 +375,6 @@ public class ClientController implements EmailUpdateListener {
         detailOrComposeStack.getChildren().add(composeView);
         sendButton.setVisible(true);
     }
-
     private void showEmailListView() {
         Platform.runLater(() -> {
             isComposeViewVisible = false;
@@ -439,7 +388,6 @@ public class ClientController implements EmailUpdateListener {
             refreshEmailList();
         });
     }
-
     private void refreshEmailList() {
         Platform.runLater(() -> {
             try {
@@ -449,8 +397,6 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
-
-
     private void populateComposeFields(Email email) {
         toField.clear();
         subjectField.setText(email.getSubject() != null ? email.getSubject() : "");
@@ -461,13 +407,11 @@ public class ClientController implements EmailUpdateListener {
 
         bodyArea.setText(email.getBody() != null ? email.getBody() : "");
     }
-
     private void clearComposeFields() {
         toField.clear();
         subjectField.clear();
         bodyArea.clear();
     }
-
     private void handleConnectionError() {
         if (!alertShown) {
             Platform.runLater(() -> {
@@ -476,7 +420,6 @@ public class ClientController implements EmailUpdateListener {
             });
         }
     }
-
     private void showErrorAlert(String title, String content) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -487,9 +430,6 @@ public class ClientController implements EmailUpdateListener {
             alert.show();
         });
     }
-
-
-
     private void showInfoAlert(String title, String content) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -499,37 +439,43 @@ public class ClientController implements EmailUpdateListener {
             alert.showAndWait();
         });
     }
-
     public void shutdown() {
-        executorService.shutdown();
+        // Remove this controller as a listener from the mail client
+        mailClient.removeEmailUpdateListener(this);
+
+        // Clean up UI resources
+        Platform.runLater(() -> {
+            if (emailTableView != null) {
+                emailTableView.setItems(null);
+            }
+        });
+
+        // Shutdown model
+        if (mailClient != null) {
+            mailClient.shutdown();
+        }
+
+        // Shutdown executor service
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdownNow();
+        }
     }
 
     @Override
     public void onNewEmailsReceived(List<Email> newEmails) {
         Platform.runLater(() -> {
-            boolean wasDetailViewVisible = emailDetailTextArea.isVisible();
-            boolean wasComposeViewVisible = composeView.isVisible();
-            Email selectedEmail = currentDisplayedEmail;
-
-            if (currentFilter.equals("Email ricevute")) {
-                newEmails.forEach(mailClient.getMailbox()::addReceivedEmail);
-                emailTableView.setItems(mailClient.getMailbox().getReceivedEmails());
-                emailTableView.refresh();
-            }
-
-            if (wasDetailViewVisible && selectedEmail != null) {
-                displayEmailDetails(selectedEmail);
-            } else if (wasComposeViewVisible) {
-                showComposeView();
+            for (Email email : newEmails) {
+                if (!mailClient.getMailbox().hasEmail(email.getId())) {
+                    mailClient.getMailbox().addNewEmail(email);
+                    emailTableView.refresh();
+                }
             }
         });
     }
-
     @Override
     public void onEmailUpdateError(Exception e) {
         handleConnectionError();
     }
-
     @Override
     public void onEmailsFiltered(String filter, List<Email> emails) {
         Platform.runLater(() -> {
@@ -546,17 +492,4 @@ public class ClientController implements EmailUpdateListener {
             }
         });
     }
-
-    private void refreshTableRow(Email email) {
-        Platform.runLater(() -> {
-            int index = emailTableView.getItems().indexOf(email);
-            if (index >= 0) {
-                emailTableView.getItems().set(index, email);
-                emailTableView.refresh();
-            }
-        });
-    }
-
-
-
 }

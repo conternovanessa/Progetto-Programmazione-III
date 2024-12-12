@@ -33,8 +33,6 @@ public class Mailbox {
         this.sentEmails = FXCollections.observableArrayList();
         this.executorService = Executors.newCachedThreadPool();
     }
-
-
     public synchronized void loadEmailsFromDisk() {
         executorService.submit(() -> {
             try {
@@ -60,7 +58,6 @@ public class Mailbox {
             }
         });
     }
-
     public synchronized void addNewEmail(Email email) {
         try {
             if (mailboxLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
@@ -84,7 +81,6 @@ public class Mailbox {
             Thread.currentThread().interrupt();
         }
     }
-
     public void setEmailAddress(String emailAddress) {
         // Rimuovi la porta se presente nell'indirizzo email
         if (emailAddress.contains(",")) {
@@ -97,34 +93,9 @@ public class Mailbox {
             loadEmailsFromDisk();
         }
     }
-
-
-    public void updateEmailReadStatus(Email email) {
-        for (Email e : receivedEmails) {
-            if (e.getId() == email.getId()) {
-                e.setRead(true);
-                break;
-            }
-        }
-
-        for (Email e : sentEmails) {
-            if (e.getId() == email.getId()) {
-                e.setRead(true);
-                break;
-            }
-        }
-    }
-
-
-
-    public void setEmailLoadedCallback(Runnable callback) {
-        this.emailLoadedCallback = callback;
-    }
-
     public String getEmailAddress() {
         return emailAddress;
     }
-
     public ObservableList<Email> getReceivedEmails() {
         try {
             if (mailboxLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
@@ -139,44 +110,31 @@ public class Mailbox {
         }
         return FXCollections.emptyObservableList();
     }
-
     public ObservableList<Email> getSentEmails() {
         return sentEmails;
     }
-
     public void addReceivedEmail(Email email) {
         receivedEmails.add(email);
     }
-
     public void addSentEmail(Email email) {
         sentEmails.add(email);
     }
-
     public void clearEmails() {
         receivedEmails.clear();
         sentEmails.clear();
     }
-
-
-    public int getTotalEmailCount() {
-        return receivedEmails.size() + sentEmails.size();
-    }
-
     public synchronized void removeEmail(Email email) {
         receivedEmails.removeIf(e -> e.getId() == email.getId());
         sentEmails.removeIf(e -> e.getId() == email.getId());
     }
-
     public synchronized boolean hasEmail(int emailId) {
         return receivedEmails.stream().anyMatch(e -> e.getId() == emailId) ||
                 sentEmails.stream().anyMatch(e -> e.getId() == emailId);
     }
-
     public void clearAllEmails() {
         receivedEmails.clear();
         sentEmails.clear();
     }
-
     @Override
     public String toString() {
         return "Mailbox{" +
