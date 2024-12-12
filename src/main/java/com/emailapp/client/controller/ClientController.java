@@ -356,7 +356,7 @@ public class ClientController implements EmailUpdateListener {
             emailDetailTextArea.setText(details.toString());
             emailDetailTextArea.setVisible(true);
             emailDetailFlow.setVisible(true);
-            emailTableView.setVisible(true);
+            emailTableView.setVisible(false);
             actionButtons.setVisible(true);
             composeView.setVisible(false);
 
