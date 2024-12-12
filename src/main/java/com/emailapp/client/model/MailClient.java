@@ -117,9 +117,7 @@ public class MailClient {
                     Alert alert = new Alert(Alert.AlertType.INFORMATION);
                     alert.setTitle("Nuova Email");
                     alert.setHeaderText(null);
-                    String message = newEmails.size() == 1
-                            ? "Hai ricevuto 1 nuova mail"
-                            : "Hai ricevuto " + newEmails.size() + " nuove mail";
+                    String message = mailbox.getEmailAddress() + " ha ricevuto una nuova mail";
                     alert.setContentText(message);
                     alert.show();
                 });
@@ -129,6 +127,7 @@ public class MailClient {
             notifyListeners(listener -> listener.onEmailUpdateError(e));
         }
     }
+
 
 
     public BooleanProperty connectedProperty() {
