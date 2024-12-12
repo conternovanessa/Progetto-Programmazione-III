@@ -16,12 +16,26 @@ public class Server extends Application {
     private static final int DEFAULT_PORT = 5000;
     private final ReentrantLock serverLock = new ReentrantLock(true);
     private static final long LOCK_TIMEOUT = 3000;
+    private volatile boolean isShuttingDown = false;
+    private static Server instance;
 
+    public Server() {
+        instance = this;
+    }
+
+    public static Server getInstance() {
+        return instance;
+    }
+
+    @Override
     public void start(Stage primaryStage) throws Exception {
+        if (isShuttingDown) return;
+
         try {
             if (!serverLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Timeout durante l'avvio del server");
             }
+
             try {
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/emailapp/server/ServerView.fxml"));
                 Parent root = loader.load();
@@ -32,14 +46,16 @@ public class Server extends Application {
                 primaryStage.setTitle("Email Server");
 
                 primaryStage.setOnCloseRequest(e -> {
-                    stopServer();
-                    Platform.exit();
+                    e.consume();
+                    performCleanShutdown(primaryStage);
                 });
 
                 startServer();
                 primaryStage.show();
             } finally {
-                serverLock.unlock();
+                if (serverLock.isHeldByCurrentThread()) {
+                    serverLock.unlock();
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -47,15 +63,45 @@ public class Server extends Application {
         }
     }
 
+    private void performCleanShutdown(Stage primaryStage) {
+        if (isShuttingDown) return;
+
+        isShuttingDown = true;
+        try {
+            stopServer();
+
+            // Ensure all resources are released
+            if (controller != null) {
+                controller.shutdown(); // Add this method to ServerController
+            }
+
+            Platform.runLater(() -> {
+                try {
+                    primaryStage.close();
+                } finally {
+                    Platform.exit();
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public void startServer() {
+        if (isShuttingDown) return;
+
         try {
             if (!serverLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Timeout durante l'avvio del server");
             }
             try {
-                controller.startServer(DEFAULT_PORT);
+                if (controller != null) {
+                    controller.startServer(DEFAULT_PORT);
+                }
             } finally {
-                serverLock.unlock();
+                if (serverLock.isHeldByCurrentThread()) {
+                    serverLock.unlock();
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -64,29 +110,28 @@ public class Server extends Application {
     }
 
     public void stopServer() {
+        if (isShuttingDown) return;
+
         try {
             if (!serverLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante l'arresto del server");
+                return;
             }
             try {
                 if (controller != null) {
                     controller.stopServer();
                 }
             } finally {
-                serverLock.unlock();
+                if (serverLock.isHeldByCurrentThread()) {
+                    serverLock.unlock();
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Operazione interrotta durante l'arresto del server");
         }
     }
 
     @Override
     public void stop() {
-        stopServer();
-    }
-
-    public ServerController getController() {
-        return controller;
+        performCleanShutdown(null);
     }
 }

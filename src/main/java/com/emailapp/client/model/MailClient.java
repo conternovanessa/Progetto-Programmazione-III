@@ -72,7 +72,24 @@ public class MailClient {
             try {
                 if (isConnected()) {
                     List<Email> emails = fetchEmails(filter);
-                    notifyListeners(listener -> listener.onEmailsFiltered(filter, emails));
+                    if (emails != null) {
+                        if (filter.equals(SENT_EMAILS)) {
+                            // Aggiorna la mailbox solo con le nuove email inviate
+                            for (Email email : emails) {
+                                if (!mailbox.hasEmail(email.getId())) {
+                                    mailbox.addSentEmail(email);
+                                }
+                            }
+                        } else {
+                            // Aggiorna la mailbox solo con le nuove email ricevute
+                            for (Email email : emails) {
+                                if (!mailbox.hasEmail(email.getId())) {
+                                    mailbox.addReceivedEmail(email);
+                                }
+                            }
+                        }
+                        notifyListeners(listener -> listener.onEmailsFiltered(filter, emails));
+                    }
                 } else {
                     List<Email> localEmails = filter.equals(SENT_EMAILS) ?
                             new ArrayList<>(mailbox.getSentEmails()) :
@@ -87,7 +104,6 @@ public class MailClient {
             throw new Exception("Timeout durante l'accesso alla mailbox");
         }
     }
-
 
     public void pollForNewEmails() {
         if (!isConnected()) return;
