@@ -136,10 +136,18 @@ public class EmailFileManager {
                 String subject = reader.readLine().substring(9);
                 String dateStr = reader.readLine().substring(6);
                 boolean read = Boolean.parseBoolean(reader.readLine().substring(6));
-                String bodyLine = reader.readLine();
-                String body = bodyLine.substring(6);
 
-                Email email = new Email(sender, recipients, subject, body);
+                // Legge la prima riga del body (che inizia con "Body: ")
+                String firstBodyLine = reader.readLine().substring(6);
+
+                // Legge il resto del corpo dell'email
+                StringBuilder bodyBuilder = new StringBuilder(firstBodyLine);
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    bodyBuilder.append("\n").append(line);
+                }
+
+                Email email = new Email(sender, recipients, subject, bodyBuilder.toString());
                 email.setId(id);
                 email.setSentDate(java.time.LocalDateTime.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
                 email.setRead(read);
@@ -147,6 +155,7 @@ public class EmailFileManager {
             }
         }
     }
+
 
     public static boolean deleteEmail(int emailId, String userEmail) throws IOException {
         synchronized(FILE_LOCK) {

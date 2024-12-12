@@ -1,7 +1,0 @@
-Id: 9
-From: fabiodelia@progetto.com
-To: filippoditto@progetto.com
-Subject: ses
-Date: 2024-12-12T11:07:47.303407300
-Read: false
-Body: sis
