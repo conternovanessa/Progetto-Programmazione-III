@@ -150,7 +150,6 @@ public class EmailFileManager {
                 Email email = new Email(sender, recipients, subject, bodyBuilder.toString());
                 email.setId(id);
                 email.setSentDate(java.time.LocalDateTime.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-                email.setRead(read);
                 return email;
             }
         }

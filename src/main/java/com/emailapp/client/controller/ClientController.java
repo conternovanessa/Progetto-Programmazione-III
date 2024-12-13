@@ -178,17 +178,15 @@ public class ClientController implements EmailUpdateListener {
 
     private void handleEmailSelection(Email email) {
         try {
-            if (!email.isRead()) {
-                Platform.runLater(() -> {
-                    emailTableView.refresh();
-                    // Force a complete refresh of the list
+            Platform.runLater(() -> {
+                emailTableView.refresh();
+
                     if (currentFilter.equals(MailClient.RECEIVED_EMAILS)) {
                         ObservableList<Email> currentList = mailClient.getMailbox().getReceivedEmails();
                         emailTableView.setItems(null);
                         emailTableView.setItems(currentList);
                     }
                 });
-            }
             displayEmailDetails(email);
         } catch (Exception e) {
             showErrorAlert("Errore", "Impossibile aprire l'email");

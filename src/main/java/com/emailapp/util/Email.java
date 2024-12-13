@@ -13,12 +13,10 @@ public class Email implements Serializable {
     private String subject;
     private String body;
     private LocalDateTime sentDate;
-    private boolean read;
     private transient SimpleBooleanProperty readProperty;
 
     public Email() {
         this.sentDate = LocalDateTime.now();
-        this.read = false;
         this.readProperty = new SimpleBooleanProperty(false);
         this.recipients = new ArrayList<>();
     }
@@ -29,7 +27,6 @@ public class Email implements Serializable {
         this.subject = subject;
         this.body = body;
         this.sentDate = LocalDateTime.now();
-        this.read = false;
         this.readProperty = new SimpleBooleanProperty(false);
     }
 
@@ -81,28 +78,6 @@ public class Email implements Serializable {
         this.sentDate = sentDate;
     }
 
-    public boolean isRead() {
-        if (readProperty == null) {
-            readProperty = new SimpleBooleanProperty(read);
-        }
-        return readProperty.get();
-    }
-
-    public void setRead(boolean read) {
-        this.read = read;
-        if (readProperty == null) {
-            readProperty = new SimpleBooleanProperty();
-        }
-        this.readProperty.set(read);
-    }
-
-    public SimpleBooleanProperty readProperty() {
-        if (readProperty == null) {
-            readProperty = new SimpleBooleanProperty(read);
-        }
-        return readProperty;
-    }
-
     @Override
     public String toString() {
         return "Email{" +
@@ -111,7 +86,6 @@ public class Email implements Serializable {
                 ", recipients=" + recipients +
                 ", subject='" + subject + '\'' +
                 ", sentDate=" + sentDate +
-                ", read=" + read +
                 '}';
     }
 
