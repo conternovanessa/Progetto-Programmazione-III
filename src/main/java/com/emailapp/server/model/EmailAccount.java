@@ -13,8 +13,8 @@ public class EmailAccount {
     private final String emailAddress;
     private final ObservableList<Email> inbox;
     private final ObservableList<Email> sent;
-    private final ReadWriteLock accountLock = new ReentrantReadWriteLock(true); // Fair lock
-    private static final long LOCK_TIMEOUT = 3000; // 3 secondi timeout
+    private final ReadWriteLock accountLock = new ReentrantReadWriteLock(true);
+    private static final long LOCK_TIMEOUT = 3000;
 
     public EmailAccount(String emailAddress) {
         this.emailAddress = emailAddress;

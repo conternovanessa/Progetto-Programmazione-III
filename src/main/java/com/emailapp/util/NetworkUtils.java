@@ -54,16 +54,6 @@ public class NetworkUtils {
         }
     }
 
-    private static void closeQuietly(Closeable resource) {
-        if (resource != null) {
-            try {
-                resource.close();
-            } catch (IOException e) {
-                // log error
-            }
-        }
-    }
-
     @FunctionalInterface
     public interface ResponseHandler {
         void handle(ObjectInputStream in) throws IOException, ClassNotFoundException;

@@ -16,13 +16,10 @@ import javafx.scene.control.Button;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 public class ServerController implements ServerObserver {
     private final MailServer mailServer;
@@ -33,8 +30,6 @@ public class ServerController implements ServerObserver {
     private static final int SOCKET_TIMEOUT = 30000;
     private final Set<String> initialFetchDone = Collections.synchronizedSet(new HashSet<>());
     private final Object socketLock = new Object();
-    private final ReentrantLock serverStateLock = new ReentrantLock(true);
-    private static final long LOCK_TIMEOUT = 3000; // 3 secondi timeout
 
     @FXML private Label portLabel;
     @FXML private Button startStopButton;
