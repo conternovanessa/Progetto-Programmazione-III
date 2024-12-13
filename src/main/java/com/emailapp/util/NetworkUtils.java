@@ -15,7 +15,7 @@ public class NetworkUtils {
     private static ObjectOutputStream createOutputStream(Socket socket) throws IOException {
         socket.setSoTimeout(SOCKET_TIMEOUT);
         ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-        out.flush(); // Important to flush header
+        out.flush();
         return out;
     }
 
@@ -52,10 +52,5 @@ public class NetworkUtils {
         } catch (SocketTimeoutException e) {
             throw new SocketException("Timeout nella lettura dal server");
         }
-    }
-
-    @FunctionalInterface
-    public interface ResponseHandler {
-        void handle(ObjectInputStream in) throws IOException, ClassNotFoundException;
     }
 }

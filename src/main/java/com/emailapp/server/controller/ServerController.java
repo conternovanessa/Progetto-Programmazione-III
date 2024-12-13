@@ -67,7 +67,7 @@ public class ServerController implements ServerObserver {
                 serverSocket.setReuseAddress(true);
                 isRunning = true;
                 mailServer.loadExistingEmails();
-                onServerStateChanged(true); // This will handle both logging and button state
+                onServerStateChanged(true);
                 acceptConnections();
             } catch (IOException e) {
                 logEvent("❌ Errore avvio server: " + e.getMessage());
@@ -99,8 +99,7 @@ public class ServerController implements ServerObserver {
                 Thread.currentThread().interrupt();
             }
         }
-
-        onServerStateChanged(false); // This will handle both logging and button state
+        onServerStateChanged(false);
     }
 
     @Override
@@ -341,26 +340,12 @@ public class ServerController implements ServerObserver {
         alert.show();
     }
 
-    private void showErrorAlert(String title, String header, String content) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle(title);
-            alert.setHeaderText(header);
-            alert.setContentText(content);
-            alert.show();
-        });
-    }
-
     private void updateButtonState() {
         Platform.runLater(() -> startStopButton.setText(isRunning ? "Stop Server" : "Start Server"));
     }
 
     public void logEvent(String message) {
         Platform.runLater(() -> logTextArea.appendText(message + "\n"));
-    }
-
-    public boolean isRunning() {
-        return isRunning;
     }
 
     @Override
@@ -388,10 +373,7 @@ public class ServerController implements ServerObserver {
 
     public void shutdown() {
         try {
-            // Stop accepting new connections
             stopServer();
-
-            // Clear any pending operations
             if (executorService != null) {
                 executorService.shutdownNow();
                 try {
@@ -400,8 +382,6 @@ public class ServerController implements ServerObserver {
                     Thread.currentThread().interrupt();
                 }
             }
-
-            // Clear resources
             if (mailServer != null) {
                 mailServer.removeObserver(this);
             }

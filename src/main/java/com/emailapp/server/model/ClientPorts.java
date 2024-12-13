@@ -35,10 +35,6 @@ public class ClientPorts {
         }
     }
 
-    public static int getControlPort() {
-        return 5000;
-    }
-
     public static int getPortForClient(String email) {
         try {
             if (!portsLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
@@ -55,70 +51,6 @@ public class ClientPorts {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Operazione interrotta durante l'accesso alla porta", e);
-        }
-    }
-
-    public static boolean isValidPort(int port) {
-        try {
-            if (!portsLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante la validazione della porta");
-            }
-            try {
-                return CLIENT_PORTS.containsValue(port);
-            } finally {
-                portsLock.readLock().unlock();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Operazione interrotta durante la validazione della porta", e);
-        }
-    }
-
-    public static boolean hasAssignedPort(String email) {
-        try {
-            if (!portsLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante la verifica della porta assegnata");
-            }
-            try {
-                return CLIENT_PORTS.containsKey(email);
-            } finally {
-                portsLock.readLock().unlock();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Operazione interrotta durante la verifica della porta", e);
-        }
-    }
-
-    public static void addPort(String email, int port) {
-        try {
-            if (!portsLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante l'aggiunta della porta");
-            }
-            try {
-                CLIENT_PORTS.put(email, port);
-            } finally {
-                portsLock.writeLock().unlock();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Operazione interrotta durante l'aggiunta della porta", e);
-        }
-    }
-
-    public static void removePort(String email) {
-        try {
-            if (!portsLock.writeLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante la rimozione della porta");
-            }
-            try {
-                CLIENT_PORTS.remove(email);
-            } finally {
-                portsLock.writeLock().unlock();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Operazione interrotta durante la rimozione della porta", e);
         }
     }
 }

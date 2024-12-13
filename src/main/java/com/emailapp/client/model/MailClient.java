@@ -38,7 +38,7 @@ public class MailClient {
     private Socket clientSocket;
 
     public MailClient(String emailAddress) {
-        // Rimuovi la porta se presente nell'indirizzo email
+
         if (emailAddress.contains(",")) {
             emailAddress = emailAddress.split(",")[0].trim();
         }
@@ -76,14 +76,14 @@ public class MailClient {
                     List<Email> emails = fetchEmails(filter);
                     if (emails != null) {
                         if (filter.equals(SENT_EMAILS)) {
-                            // Aggiorna la mailbox solo con le nuove email inviate
+
                             for (Email email : emails) {
                                 if (!mailbox.hasEmail(email.getId())) {
                                     mailbox.addSentEmail(email);
                                 }
                             }
                         } else {
-                            // Aggiorna la mailbox solo con le nuove email ricevute
+
                             for (Email email : emails) {
                                 if (!mailbox.hasEmail(email.getId())) {
                                     mailbox.addReceivedEmail(email);
@@ -127,8 +127,6 @@ public class MailClient {
             notifyListeners(listener -> listener.onEmailUpdateError(e));
         }
     }
-
-
 
     public BooleanProperty connectedProperty() {
         return connectedProperty;
@@ -289,7 +287,7 @@ public class MailClient {
                     return (List<Email>) list;
                 }
             }
-            return List.of(); // Return empty list if response is not valid
+            return List.of();
         }
     }
 
@@ -316,8 +314,6 @@ public class MailClient {
         } finally {
             mailboxLock.writeLock().unlock();
         }
-
-        // Shutdown executor
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdownNow();
             try {
@@ -326,8 +322,6 @@ public class MailClient {
                 Thread.currentThread().interrupt();
             }
         }
-
-        // Clear listeners
         synchronized(listenersLock) {
             listeners.clear();
         }

@@ -70,9 +70,9 @@ public class Server extends Application {
         try {
             stopServer();
 
-            // Ensure all resources are released
+
             if (controller != null) {
-                controller.shutdown(); // Add this method to ServerController
+                controller.shutdown();
             }
 
             Platform.runLater(() -> {

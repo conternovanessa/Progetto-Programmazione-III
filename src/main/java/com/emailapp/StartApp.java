@@ -28,7 +28,7 @@ public class StartApp extends Application {
     private Stage recentClientsStage;
     private ListView<String> clientsList;
 
-    // Metodi di inizializzazione principale
+
     @Override
     public void start(Stage primaryStage) {
         instance = this;
@@ -42,7 +42,7 @@ public class StartApp extends Application {
         return instance;
     }
 
-    // Gestione Server
+
     private void startServer() {
         Platform.runLater(() -> {
             try {
@@ -56,7 +56,7 @@ public class StartApp extends Application {
         });
     }
 
-    // Gestione Client
+
     private void startInitialClients() {
         List<String> emailAddresses = readEmailAddresses();
         for (String email : emailAddresses) {
@@ -84,7 +84,7 @@ public class StartApp extends Application {
         }
     }
 
-    // Gestione Registrazione Client
+
     public void registerClient(String email, Stage stage) {
         synchronized(lock) {
             activeClients.put(email, stage);
@@ -106,7 +106,7 @@ public class StartApp extends Application {
         }
     }
 
-    // Gestione Finestra Client Recenti
+
     private void initializeRecentClientsWindow() {
         recentClientsStage = new Stage();
         recentClientsStage.setTitle("Client Recenti");
@@ -192,7 +192,7 @@ public class StartApp extends Application {
         }
     }
 
-    // Gestione File
+
     private List<String> readEmailAddresses() {
         List<String> emails = new ArrayList<>();
         try (InputStream is = getClass().getResourceAsStream("/emails.txt");
@@ -214,7 +214,7 @@ public class StartApp extends Application {
         return emails;
     }
 
-    // Gestione Errori
+
     private void handleError(String title, String message) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -225,7 +225,7 @@ public class StartApp extends Application {
         });
     }
 
-    // Chiusura Applicazione
+
     @Override
     public void stop() {
         synchronized(lock) {

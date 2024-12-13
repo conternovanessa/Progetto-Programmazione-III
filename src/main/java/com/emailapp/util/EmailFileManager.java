@@ -137,10 +137,10 @@ public class EmailFileManager {
                 String dateStr = reader.readLine().substring(6);
                 boolean read = Boolean.parseBoolean(reader.readLine().substring(6));
 
-                // Legge la prima riga del body (che inizia con "Body: ")
+
                 String firstBodyLine = reader.readLine().substring(6);
 
-                // Legge il resto del corpo dell'email
+
                 StringBuilder bodyBuilder = new StringBuilder(firstBodyLine);
                 String line;
                 while ((line = reader.readLine()) != null) {

@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class MailServer {
     private final Map<String, EmailAccount> accounts;
     private final ServerController serverController;
-    private final ReadWriteLock serverLock = new ReentrantReadWriteLock(true); // Fair lock
+    private final ReadWriteLock serverLock = new ReentrantReadWriteLock(true);
     private final Map<String, Queue<Email>> messageQueues;
     private final List<ServerObserver> observers = Collections.synchronizedList(new ArrayList<>());
     private final Object OBSERVER_LOCK = new Object();
@@ -73,7 +73,6 @@ public class MailServer {
     }
 
     private void validateEmail(String email) throws IllegalArgumentException {
-        // Check for null or empty
         if (email == null || email.trim().isEmpty()) {
             serverController.logEvent("❌ Errore: Email vuota o null");
             throw new IllegalArgumentException("L'indirizzo email non può essere vuoto");
@@ -116,20 +115,14 @@ public class MailServer {
                 throw new IOException("Timeout durante l'acquisizione del lock");
             }
             try {
-                // 1. Validation
                 validateEmail(email.getSender());
                 for (String recipient : email.getRecipients()) {
                     validateEmail(recipient);
                 }
-
                 String sender = email.getSender();
                 List<String> recipients = email.getRecipients();
-
-                // 2. Account creation
                 createAccount(sender);
                 recipients.forEach(this::createAccount);
-
-                // 3. Process sender's copy
                 int sentEmailId = EmailFileManager.getNextId();
                 Email senderCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
                 senderCopy.setId(sentEmailId);
@@ -144,8 +137,6 @@ public class MailServer {
                     serverController.logEvent("❌ Errore salvataggio email per mittente " + sender);
                     throw e;
                 }
-
-                // 4. Process recipients' copies
                 for (String recipient : recipients) {
                     int recipientEmailId = EmailFileManager.getNextId();
                     Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
@@ -214,7 +205,6 @@ public class MailServer {
     public boolean deleteEmail(int emailId, String requestingUser) {
         serverLock.writeLock().lock();
         try {
-            // 1. Get user account
             EmailAccount account = accounts.get(requestingUser);
             if (account == null) {
                 serverController.logEvent("⚠️ Account non trovato: " + requestingUser);
@@ -227,7 +217,6 @@ public class MailServer {
             if (deletedFromInbox || deletedFromSent) {
                 try {
                     EmailFileManager.deleteEmail(emailId, requestingUser);
-                    // Notify observers
                     notifyEmailDeleted(emailId);
                     return true;
                 } catch (IOException e) {
@@ -236,7 +225,6 @@ public class MailServer {
                     return false;
                 }
             }
-
             serverController.logEvent("⚠️ Email " + emailId + " non trovata per " + requestingUser);
             return false;
         } finally {

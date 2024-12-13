@@ -121,36 +121,4 @@ public class EmailAccount {
             throw new RuntimeException("Operazione interrotta durante la rimozione dalle email inviate");
         }
     }
-
-    public Email getEmailById(int emailId) {
-        try {
-            if (!accountLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Timeout durante la ricerca email");
-            }
-            try {
-                Email inboxEmail = inbox.stream()
-                        .filter(e -> e.getId() == emailId)
-                        .findFirst()
-                        .orElse(null);
-
-                if (inboxEmail != null) {
-                    return inboxEmail;
-                }
-
-                return sent.stream()
-                        .filter(e -> e.getId() == emailId)
-                        .findFirst()
-                        .orElse(null);
-            } finally {
-                accountLock.readLock().unlock();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Operazione interrotta durante la ricerca email");
-        }
-    }
-
-    public String getEmailAddress() {
-        return emailAddress;
-    }
 }

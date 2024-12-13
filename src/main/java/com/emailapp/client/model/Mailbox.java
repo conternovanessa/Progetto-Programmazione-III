@@ -65,11 +65,11 @@ public class Mailbox {
                     Platform.runLater(() -> {
                         if (email.getSender().equals(emailAddress)) {
                             if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                                sentEmails.add(0, email);  // Inserisce direttamente in cima
+                                sentEmails.add(0, email);
                             }
                         } else {
                             if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                                receivedEmails.add(0, email);  // Inserisce direttamente in cima
+                                receivedEmails.add(0, email);
                             }
                         }
                     });
@@ -82,7 +82,6 @@ public class Mailbox {
         }
     }
     public void setEmailAddress(String emailAddress) {
-        // Rimuovi la porta se presente nell'indirizzo email
         if (emailAddress.contains(",")) {
             emailAddress = emailAddress.split(",")[0].trim();
         }
@@ -116,12 +115,12 @@ public class Mailbox {
     }
     public void addReceivedEmail(Email email) {
         if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-            receivedEmails.add(0, email);  // Inserisce all'inizio della lista
+            receivedEmails.add(0, email);
         }
     }
     public void addSentEmail(Email email) {
         if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-            sentEmails.add(0, email);  // Inserisce all'inizio della lista
+            sentEmails.add(0, email);
         }
     }
     public void clearEmails() {

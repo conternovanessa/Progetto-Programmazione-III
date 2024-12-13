@@ -82,7 +82,6 @@ public class ClientController implements EmailUpdateListener {
     }
 
     public void setEmailAddress(String emailAddress) {
-        // Rimuovi la porta se presente nell'indirizzo email
         if (emailAddress.contains(",")) {
             emailAddress = emailAddress.split(",")[0].trim();
         }
@@ -349,7 +348,7 @@ public class ClientController implements EmailUpdateListener {
             details.append("To: ").append(String.join(", ", email.getRecipients())).append("\n");
             details.append("Subject: ").append(email.getSubject()).append("\n");
             details.append("Date: ").append(email.getSentDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).append("\n");
-            details.append("\n");  // Empty line before body
+            details.append("\n");
             details.append(email.getBody());
 
             emailDetailTextArea.setText(details.toString());
@@ -464,22 +463,19 @@ public class ClientController implements EmailUpdateListener {
     }
 
     public void shutdown() {
-        // Remove this controller as a listener from the mail client
         mailClient.removeEmailUpdateListener(this);
-
-        // Clean up UI resources
         Platform.runLater(() -> {
             if (emailTableView != null) {
                 emailTableView.setItems(null);
             }
         });
 
-        // Shutdown model
+
         if (mailClient != null) {
             mailClient.shutdown();
         }
 
-        // Shutdown executor service
+
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdownNow();
         }
@@ -488,13 +484,12 @@ public class ClientController implements EmailUpdateListener {
     @Override
     public void onNewEmailsReceived(List<Email> newEmails) {
         Platform.runLater(() -> {
-            // Ordina le nuove email per data decrescente
+
             newEmails.sort((e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
 
             for (Email email : newEmails) {
                 if (!mailClient.getMailbox().hasEmail(email.getId())) {
                     mailClient.getMailbox().addNewEmail(email);
-                    // Riordina la tabella
                     ObservableList<Email> items = emailTableView.getItems();
                     FXCollections.sort(items,
                             (e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
@@ -514,7 +509,6 @@ public class ClientController implements EmailUpdateListener {
     public void onEmailsFiltered(String filter, List<Email> emails) {
         Platform.runLater(() -> {
             if (emails != null) {
-                // Aggiorna solo le email che sono effettivamente cambiate
                 if (filter.equals(MailClient.SENT_EMAILS)) {
                     updateEmailList(mailClient.getMailbox().getSentEmails(), emails);
                     emailTableView.setItems(mailClient.getMailbox().getSentEmails());
@@ -528,19 +522,13 @@ public class ClientController implements EmailUpdateListener {
     }
 
     private void updateEmailList(ObservableList<Email> currentList, List<Email> newEmails) {
-        // Ordina le nuove email per data decrescente (più recenti prima)
         newEmails.sort((e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
-
-        // Rimuovi le email duplicate e mantieni solo le nuove
         List<Email> emailsToAdd = newEmails.stream()
                 .filter(newEmail -> !currentList.stream()
                         .anyMatch(e -> e.getId() == newEmail.getId()))
                 .toList();
-
-        // Aggiungi le nuove email all'inizio della lista
         Platform.runLater(() -> {
             currentList.addAll(0, emailsToAdd);
-            // Riordina l'intera lista per data
             FXCollections.sort(currentList,
                     (e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
         });
