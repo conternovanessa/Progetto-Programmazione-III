@@ -10,20 +10,17 @@ public class Email implements Serializable {
     private int id;
     private String sender;
     private List<String> recipients;
-    private List<String> ccRecipients;
     private String subject;
     private String body;
     private LocalDateTime sentDate;
     private boolean read;
     private transient SimpleBooleanProperty readProperty;
-    private String replyTo;
 
     public Email() {
         this.sentDate = LocalDateTime.now();
         this.read = false;
         this.readProperty = new SimpleBooleanProperty(false);
         this.recipients = new ArrayList<>();
-        this.ccRecipients = new ArrayList<>();
     }
 
     public Email(String sender, List<String> recipients, String subject, String body) {
@@ -118,19 +115,4 @@ public class Email implements Serializable {
                 '}';
     }
 
-    public List<String> getCcRecipients() {
-        return ccRecipients;
-    }
-
-    public void setCcRecipients(List<String> ccRecipients) {
-        this.ccRecipients = ccRecipients;
-    }
-
-    public String getReplyTo() {
-        return replyTo;
-    }
-
-    public void setReplyTo(String replyTo) {
-        this.replyTo = replyTo;
-    }
 }
