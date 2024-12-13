@@ -231,16 +231,22 @@ public class ServerController implements ServerObserver {
     }
 
     private void handleDeleteEmail(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
-        Object idObj = NetworkUtils.receiveObject(clientSocket);
-        int emailId = Integer.parseInt(idObj.toString());
+        logEvent("🔌 Apertura connessione socket per eliminazione da client: " + requestingUser);
+        try {
+            Object idObj = NetworkUtils.receiveObject(clientSocket);
+            int emailId = Integer.parseInt(idObj.toString());
 
-        logEvent("Richiesta al server di eliminare una email con Id: " + emailId +" per l'account: "+ requestingUser);
-        boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
-        NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
+            logEvent("📨 Richiesta eliminazione ricevuta per email ID: " + emailId + " from user: " + requestingUser);
+            boolean deleted = mailServer.deleteEmail(emailId, requestingUser);
+            NetworkUtils.sendObject(clientSocket, deleted ? "OK" : "ERROR");
 
-        logEvent(deleted ?
-                "🗑 Email " + emailId + " eliminata da: " + requestingUser :
-                "❌ Eliminazione email " + emailId + " fallita per: " + requestingUser);
+
+            logEvent("✅ Eliminazione completata per email ID: " + emailId);
+        } catch (Exception e) {
+            logEvent("❌ Errore durante l'eliminazione: " + e.getMessage());
+        } finally {
+            logEvent("🔌 Chiusura connessione socket per eliminazione");
+        }
     }
 
     private void handleFetchSentEmails(Socket clientSocket) throws IOException, ClassNotFoundException {
