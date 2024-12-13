@@ -236,7 +236,7 @@ public class MailClient {
 
         Email replyAllTemplate = new Email();
         replyAllTemplate.setRecipients(new ArrayList<>(recipients));
-        replyAllTemplate.setSubject("Re: " + originalEmail.getSubject());
+        replyAllTemplate.setSubject("Re_all: " + originalEmail.getSubject());
         replyAllTemplate.setBody("\n\n----- Messaggio Originale -----\n" + originalEmail.getBody());
         replyAllTemplate.setSender(mailbox.getEmailAddress());
         return replyAllTemplate;

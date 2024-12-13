@@ -78,8 +78,6 @@ public class MailServer {
             serverController.logEvent("❌ Errore: Email vuota o null");
             throw new IllegalArgumentException("L'indirizzo email non può essere vuoto");
         }
-
-        // Check @ presence and position
         int atIndex = email.indexOf('@');
         if (atIndex == -1) {
             serverController.logEvent("❌ Errore: Manca la @ nell'indirizzo " + email);
@@ -89,19 +87,13 @@ public class MailServer {
             serverController.logEvent("❌ Errore: @ in posizione non valida in " + email);
             throw new IllegalArgumentException("@ non può essere all'inizio o alla fine dell'indirizzo");
         }
-
-        // Split and validate parts
         String[] parts = email.split("@");
         String username = parts[0];
         String domain = parts[1];
-
-        // Validate domain
         if (!"progetto.com".equals(domain)) {
             serverController.logEvent("❌ Errore: Dominio non valido " + domain);
             throw new IllegalArgumentException("Il dominio deve essere progetto.com");
         }
-
-        // Validate username against valid emails
         try {
             List<String> validUsernames = EmailFileManager.loadValidEmails()
                     .stream()
@@ -185,17 +177,6 @@ public class MailServer {
                 .offer(email);
     }
 
-
-    public List<Email> getNewEmails(String recipient) {
-        serverLock.readLock().lock();
-        try {
-            EmailAccount account = accounts.get(recipient);
-            return account != null ? new ArrayList<>(account.getInbox()) : new ArrayList<>();
-        } finally {
-            serverLock.readLock().unlock();
-        }
-    }
-
     public List<Email> retrieveQueuedEmails(String recipient) {
         serverLock.readLock().lock();
         try {
@@ -240,14 +221,11 @@ public class MailServer {
                 return false;
             }
 
-            // 2. Try to delete from both inbox and sent
             boolean deletedFromInbox = account.removeFromInbox(emailId);
             boolean deletedFromSent = account.removeFromSent(emailId);
 
-            // 3. If deleted from either location
             if (deletedFromInbox || deletedFromSent) {
                 try {
-                    // Delete from file system
                     EmailFileManager.deleteEmail(emailId, requestingUser);
                     // Notify observers
                     notifyEmailDeleted(emailId);
@@ -281,21 +259,6 @@ public class MailServer {
         try {
             EmailAccount account = accounts.get(recipient);
             return account != null ? new ArrayList<>(account.getInbox()) : new ArrayList<>();
-        } finally {
-            serverLock.readLock().unlock();
-        }
-    }
-
-    public Email getEmailById(int emailId, String requestingUser) {
-        serverLock.readLock().lock();
-        try {
-            for (EmailAccount account : accounts.values()) {
-                Email email = account.getEmailById(emailId);
-                if (email != null) {
-                    return email;
-                }
-            }
-            return null;
         } finally {
             serverLock.readLock().unlock();
         }
