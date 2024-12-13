@@ -6,6 +6,7 @@ import com.emailapp.client.model.MailClient;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -489,14 +490,22 @@ public class ClientController implements EmailUpdateListener {
     @Override
     public void onNewEmailsReceived(List<Email> newEmails) {
         Platform.runLater(() -> {
+            // Ordina le nuove email per data decrescente
+            newEmails.sort((e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
+
             for (Email email : newEmails) {
                 if (!mailClient.getMailbox().hasEmail(email.getId())) {
                     mailClient.getMailbox().addNewEmail(email);
+                    // Riordina la tabella
+                    ObservableList<Email> items = emailTableView.getItems();
+                    FXCollections.sort(items,
+                            (e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
                     emailTableView.refresh();
                 }
             }
         });
     }
+
 
     @Override
     public void onEmailUpdateError(Exception e) {
@@ -521,12 +530,23 @@ public class ClientController implements EmailUpdateListener {
     }
 
     private void updateEmailList(ObservableList<Email> currentList, List<Email> newEmails) {
-        // Aggiungi solo le email che non sono già presenti
-        for (Email newEmail : newEmails) {
-            if (!currentList.stream().anyMatch(e -> e.getId() == newEmail.getId())) {
-                currentList.add(newEmail);
-            }
-        }
+        // Ordina le nuove email per data decrescente (più recenti prima)
+        newEmails.sort((e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
+
+        // Rimuovi le email duplicate e mantieni solo le nuove
+        List<Email> emailsToAdd = newEmails.stream()
+                .filter(newEmail -> !currentList.stream()
+                        .anyMatch(e -> e.getId() == newEmail.getId()))
+                .toList();
+
+        // Aggiungi le nuove email all'inizio della lista
+        Platform.runLater(() -> {
+            currentList.addAll(0, emailsToAdd);
+            // Riordina l'intera lista per data
+            FXCollections.sort(currentList,
+                    (e1, e2) -> e2.getSentDate().compareTo(e1.getSentDate()));
+        });
     }
+
 }
 

@@ -65,11 +65,11 @@ public class Mailbox {
                     Platform.runLater(() -> {
                         if (email.getSender().equals(emailAddress)) {
                             if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                                sentEmails.add(email);
+                                sentEmails.add(0, email);  // Inserisce direttamente in cima
                             }
                         } else {
                             if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-                                receivedEmails.add(email);
+                                receivedEmails.add(0, email);  // Inserisce direttamente in cima
                             }
                         }
                     });
@@ -100,7 +100,7 @@ public class Mailbox {
         try {
             if (mailboxLock.readLock().tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
                 try {
-                    return FXCollections.unmodifiableObservableList(receivedEmails);
+                    return receivedEmails;
                 } finally {
                     mailboxLock.readLock().unlock();
                 }
@@ -110,17 +110,18 @@ public class Mailbox {
         }
         return FXCollections.emptyObservableList();
     }
+
     public ObservableList<Email> getSentEmails() {
         return sentEmails;
     }
     public void addReceivedEmail(Email email) {
         if (!receivedEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-            receivedEmails.add(email);
+            receivedEmails.add(0, email);  // Inserisce all'inizio della lista
         }
     }
     public void addSentEmail(Email email) {
         if (!sentEmails.stream().anyMatch(e -> e.getId() == email.getId())) {
-            sentEmails.add(email);
+            sentEmails.add(0, email);  // Inserisce all'inizio della lista
         }
     }
     public void clearEmails() {

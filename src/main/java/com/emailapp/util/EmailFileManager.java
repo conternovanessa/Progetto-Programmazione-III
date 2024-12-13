@@ -177,49 +177,6 @@ public class EmailFileManager {
         }
     }
 
-    public static void markEmailAsRead(int emailId, String userEmail) throws IOException {
-        synchronized(FILE_LOCK) {
-            Path inboxFile = Paths.get(BASE_DIR, userEmail, INBOX_DIR, "Email_" + emailId + ".txt");
-            if (Files.exists(inboxFile)) {
-                updateEmailReadStatus(inboxFile);
-            }
-
-            Path sentFile = Paths.get(BASE_DIR, userEmail, SENT_DIR, "Email_" + emailId + ".txt");
-            if (Files.exists(sentFile)) {
-                updateEmailReadStatus(sentFile);
-            }
-        }
-    }
-
-    public static void updateEmailReadStatus(Email email, String userEmail) throws IOException {
-        synchronized(FILE_LOCK) {
-            Path inboxFile = Paths.get(BASE_DIR, userEmail, INBOX_DIR, "Email_" + email.getId() + ".txt");
-            if (Files.exists(inboxFile)) {
-                List<String> lines = Files.readAllLines(inboxFile);
-                for (int i = 0; i < lines.size(); i++) {
-                    if (lines.get(i).startsWith("Read:")) {
-                        lines.set(i, "Read: true");
-                        break;
-                    }
-                }
-                Files.write(inboxFile, lines);
-            }
-        }
-    }
-
-    private static void updateEmailReadStatus(Path filePath) throws IOException {
-        synchronized(FILE_LOCK) {
-            List<String> lines = Files.readAllLines(filePath);
-            for (int i = 0; i < lines.size(); i++) {
-                if (lines.get(i).startsWith("Read:")) {
-                    lines.set(i, "Read: true");
-                    break;
-                }
-            }
-            Files.write(filePath, lines);
-        }
-    }
-
     public static List<String> loadValidEmails() throws IOException {
         rwLock.readLock().lock();
         try {
