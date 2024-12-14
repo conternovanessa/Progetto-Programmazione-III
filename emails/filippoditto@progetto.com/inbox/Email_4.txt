@@ -1,7 +1,0 @@
-Id: 4
-From: fabiodelia@progetto.com
-To: filippoditto@progetto.com
-Subject: 2
-Date: 2024-12-12T17:28:46.765965800
-Read: false
-Body: 2

@@ -153,7 +153,6 @@ public class ServerController implements ServerObserver {
         switch (command) {
             case "REQUEST_WRITE_SOCKET" -> handleWriteSocketRequest(clientSocket);
             case "CHECK_COMPOSE" -> NetworkUtils.sendObject(clientSocket, "OK");
-            case "SEND_EMAIL" -> handleSendEmail(clientSocket);
             case "DELETE_EMAIL" -> handleDeleteEmail(clientSocket, requestingUser);
             case "CHECK_NEW_EMAILS" -> handleCheckNewEmails(clientSocket);
             case "FETCH_SENT_EMAILS" -> handleFetchSentEmails(clientSocket);
@@ -198,6 +197,7 @@ public class ServerController implements ServerObserver {
             }
 
             dedicatedSocket.close();
+            logEvent("🔌 Chiusa socket dedicata sulla porta: " + dedicatedPort);
             dedicatedServerSocket.close();
         } catch (IOException e) {
             NetworkUtils.sendObject(clientSocket, -1);
@@ -209,19 +209,6 @@ public class ServerController implements ServerObserver {
         String recipient = (String) NetworkUtils.receiveObject(clientSocket);
         List<Email> newEmails = mailServer.retrieveQueuedEmails(recipient);
         NetworkUtils.sendObject(clientSocket, newEmails);
-    }
-
-    private void handleSendEmail(Socket clientSocket) throws IOException, ClassNotFoundException {
-        Email newEmail = (Email) NetworkUtils.receiveObject(clientSocket);
-        String senderEmail = (String) NetworkUtils.receiveObject(clientSocket);
-
-        try {
-            mailServer.sendEmail(newEmail);
-            NetworkUtils.sendObject(clientSocket, "OK");
-        } catch (Exception e) {
-            NetworkUtils.sendObject(clientSocket, "ERROR: " + e.getMessage());
-            logEvent("❌ Invio fallito da: " + senderEmail);
-        }
     }
 
     private void handleDeleteEmail(Socket clientSocket, String requestingUser) throws IOException, ClassNotFoundException {
@@ -358,11 +345,16 @@ public class ServerController implements ServerObserver {
 
     @Override
     public void onEmailReceived(Email email) {
-        Platform.runLater(() ->
-                logEvent("📥 Email ricevuta da: " + email.getRecipients() +
-                        " per: " + String.join(", ", email.getSender()))
-        );
+        Platform.runLater(() -> {
+            List<String> recipients = email.getRecipients();
+            for (String recipient : recipients) {
+                logEvent("📥 Email ricevuta da: " + recipient +
+                        " per: " + String.join(", ", email.getSender()));
+            }
+        });
     }
+
+
 
     @Override
     public void onEmailDeleted(int emailId) {

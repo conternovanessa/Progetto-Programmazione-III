@@ -137,6 +137,10 @@ public class MailServer {
                     serverController.logEvent("❌ Errore salvataggio email per mittente " + sender);
                     throw e;
                 }
+
+                synchronized(OBSERVER_LOCK) {
+                    notifyEmailReceived(senderCopy);
+                }
                 for (String recipient : recipients) {
                     int recipientEmailId = EmailFileManager.getNextId();
                     Email recipientCopy = new Email(sender, recipients, email.getSubject(), email.getBody());
@@ -146,14 +150,12 @@ public class MailServer {
                         EmailFileManager.saveEmail(recipientCopy, recipient);
                         accounts.get(recipient).addToInbox(recipientCopy);
                         queueEmail(recipientCopy, recipient);
-                        synchronized(OBSERVER_LOCK) {
-                            notifyEmailReceived(recipientCopy);
-                        }
                     } catch (IOException e) {
                         serverController.logEvent("❌ Errore salvataggio email per destinatario " + recipient);
                         throw e;
                     }
                 }
+                serverController.logEvent("✍️ Email inviata da: " + email.getSender());
             } finally {
                 serverLock.writeLock().unlock();
             }
@@ -162,6 +164,7 @@ public class MailServer {
             throw new IOException("Operazione interrotta durante l'attesa del lock");
         }
     }
+
 
     private void queueEmail(Email email, String recipient) {
         messageQueues.computeIfAbsent(recipient, k -> new ConcurrentLinkedQueue<>())
