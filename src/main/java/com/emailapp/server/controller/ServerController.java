@@ -179,12 +179,15 @@ public class ServerController implements ServerObserver {
         logEvent("📝 Richiesta apertura socket di scrittura da: " + userEmail);
         int dedicatedPort = ClientPorts.getPortForClient(userEmail);
 
+        ServerSocket dedicatedServerSocket = null;
+        Socket dedicatedSocket = null;
+
         try {
-            ServerSocket dedicatedServerSocket = new ServerSocket(dedicatedPort);
+            dedicatedServerSocket = new ServerSocket(dedicatedPort);
             logEvent("🔌 Creata socket dedicata sulla porta: " + dedicatedPort);
             NetworkUtils.sendObject(clientSocket, dedicatedPort);
 
-            Socket dedicatedSocket = dedicatedServerSocket.accept();
+            dedicatedSocket = dedicatedServerSocket.accept();
             Email newEmail = (Email) NetworkUtils.receiveObject(dedicatedSocket);
             String senderEmail = (String) NetworkUtils.receiveObject(dedicatedSocket);
 
@@ -195,13 +198,16 @@ public class ServerController implements ServerObserver {
                 NetworkUtils.sendObject(dedicatedSocket, "ERROR: " + e.getMessage());
                 logEvent("❌ Errore durante l'invio dell'email");
             }
-
-            dedicatedSocket.close();
-            logEvent("🔌 Chiusa socket dedicata sulla porta: " + dedicatedPort);
-            dedicatedServerSocket.close();
         } catch (IOException e) {
             NetworkUtils.sendObject(clientSocket, -1);
             logEvent("❌ Errore apertura socket dedicata per " + userEmail);
+        } finally {
+            closeClientSocket(dedicatedSocket);
+            if (dedicatedServerSocket != null && !dedicatedServerSocket.isClosed()) {
+                dedicatedServerSocket.close();
+            }
+            closeClientSocket(clientSocket);
+            logEvent("🔌 Socket dedicata chiusa correttamente");
         }
     }
 
@@ -226,6 +232,7 @@ public class ServerController implements ServerObserver {
         } catch (Exception e) {
             logEvent("❌ Errore durante l'eliminazione: " + e.getMessage());
         } finally {
+            closeClientSocket(clientSocket);
             logEvent("🔌 Chiusura connessione socket per eliminazione");
         }
     }
