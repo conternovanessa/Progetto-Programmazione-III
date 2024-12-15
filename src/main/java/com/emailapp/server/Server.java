@@ -14,7 +14,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class Server extends Application {
     private ServerController controller;
     private static final int DEFAULT_PORT = 5000;
-    private final ReentrantLock serverLock = new ReentrantLock(true);
+    private final ReentrantLock openLock = new ReentrantLock(true);
     private static final long LOCK_TIMEOUT = 3000;
     private volatile boolean isShuttingDown = false;
     private static Server instance;
@@ -32,7 +32,7 @@ public class Server extends Application {
         if (isShuttingDown) return;
 
         try {
-            if (!serverLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+            if (!openLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Timeout durante l'avvio del server");
             }
 
@@ -53,8 +53,8 @@ public class Server extends Application {
                 startServer();
                 primaryStage.show();
             } finally {
-                if (serverLock.isHeldByCurrentThread()) {
-                    serverLock.unlock();
+                if (openLock.isHeldByCurrentThread()) {
+                    openLock.unlock();
                 }
             }
         } catch (InterruptedException e) {
@@ -91,7 +91,7 @@ public class Server extends Application {
         if (isShuttingDown) return;
 
         try {
-            if (!serverLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+            if (!openLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Timeout durante l'avvio del server");
             }
             try {
@@ -99,8 +99,8 @@ public class Server extends Application {
                     controller.startServer(DEFAULT_PORT);
                 }
             } finally {
-                if (serverLock.isHeldByCurrentThread()) {
-                    serverLock.unlock();
+                if (openLock.isHeldByCurrentThread()) {
+                    openLock.unlock();
                 }
             }
         } catch (InterruptedException e) {
@@ -113,7 +113,7 @@ public class Server extends Application {
         if (isShuttingDown) return;
 
         try {
-            if (!serverLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
+            if (!openLock.tryLock(LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
                 return;
             }
             try {
@@ -121,8 +121,8 @@ public class Server extends Application {
                     controller.stopServer();
                 }
             } finally {
-                if (serverLock.isHeldByCurrentThread()) {
-                    serverLock.unlock();
+                if (openLock.isHeldByCurrentThread()) {
+                    openLock.unlock();
                 }
             }
         } catch (InterruptedException e) {
