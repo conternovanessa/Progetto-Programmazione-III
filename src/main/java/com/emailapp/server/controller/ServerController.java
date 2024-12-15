@@ -168,10 +168,7 @@ public class ServerController implements ServerObserver {
 
 
     private boolean requiresRequestingUser(String command) {
-        return command.equals("REPLY") ||
-                command.equals("REPLY_ALL") ||
-                command.equals("FORWARD") ||
-                command.equals("DELETE_EMAIL");
+        return command.equals("DELETE_EMAIL");
     }
 
     private void handleWriteSocketRequest(Socket clientSocket) throws IOException, ClassNotFoundException {
